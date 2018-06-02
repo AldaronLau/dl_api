@@ -1,12 +1,11 @@
 // "dl_api" crate - Licensed under the MIT LICENSE
 //  * Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
+use Error;
 use winapi;
-use kernel32;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 use std::io::{Error as IoError, ErrorKind};
-use super::super::err::Error;
 use std::ptr::null_mut;
 use std::ffi::{CStr, OsStr};
 use std::sync::Mutex;
@@ -15,7 +14,7 @@ static USE_ERRORMODE: AtomicBool = ATOMIC_BOOL_INIT;
 
 struct SetErrorModeData {
 	pub count: u32,
-	pub previous: winapi::DWORD,
+	pub previous: winapi::shared::minwindef::DWORD,
 }
 
 lazy_static! {
@@ -26,7 +25,7 @@ lazy_static! {
 }
 
 
-pub type Handle = winapi::HMODULE;
+pub type Handle = winapi::shared::minwindef::HMODULE;
 
 /*
 Windows has an ugly feature: by default not finding the given library opens a window
@@ -41,10 +40,10 @@ process.
 https://msdn.microsoft.com/pl-pl/library/windows/desktop/dd553630(v=vs.85).aspx
 */
 
-const ERROR_MODE: winapi::DWORD = 1; //app handles everything
+const ERROR_MODE: winapi::shared::minwindef::DWORD = 1; //app handles everything
 
 enum ErrorModeGuard {
-	ThreadPreviousValue(winapi::DWORD),
+	ThreadPreviousValue(winapi::shared::minwindef::DWORD),
 	DoNothing,
 	Process,
 }
@@ -52,11 +51,11 @@ enum ErrorModeGuard {
 impl ErrorModeGuard {
 	fn new() -> Result<ErrorModeGuard, IoError> {
 		if !USE_ERRORMODE.load(Ordering::Acquire) {
-			let mut previous: winapi::DWORD = 0;
-			if unsafe { kernel32::SetThreadErrorMode(ERROR_MODE, &mut previous) } == 0 {
+			let mut previous: winapi::shared::minwindef::DWORD = 0;
+			if unsafe { winapi::um::errhandlingapi::SetThreadErrorMode(ERROR_MODE, &mut previous) } == 0 {
 				//error. On some systems SetThreadErrorMode may not be implemented
-				let error = unsafe { kernel32::GetLastError() };
-				if error == winapi::ERROR_CALL_NOT_IMPLEMENTED {
+				let error = unsafe { winapi::um::errhandlingapi::GetLastError() };
+				if error == winapi::shared::winerror::ERROR_CALL_NOT_IMPLEMENTED {
 					USE_ERRORMODE.store(true, Ordering::Release);
 				} else {
 					//this is an actual error
@@ -78,7 +77,7 @@ impl ErrorModeGuard {
 		//poisoning should never happen
 		let mut lock = SET_ERR_MODE_DATA.lock().expect("Mutex got poisoned");
 		if lock.count == 0 {
-			lock.previous = unsafe { kernel32::SetErrorMode(ERROR_MODE) };
+			lock.previous = unsafe { winapi::um::errhandlingapi::SetErrorMode(ERROR_MODE) };
 			if lock.previous == ERROR_MODE {
 				return Ok(ErrorModeGuard::DoNothing);
 			}
@@ -97,18 +96,18 @@ impl Drop for ErrorModeGuard {
 				let mut lock = SET_ERR_MODE_DATA.lock().expect("Mutex got poisoned");
 				lock.count -= 1;
 				if lock.count == 0 {
-					unsafe { kernel32::SetErrorMode(lock.previous) };
+					unsafe { winapi::um::errhandlingapi::SetErrorMode(lock.previous) };
 				}
 			}
 			&mut ErrorModeGuard::ThreadPreviousValue(previous) => unsafe {
-				kernel32::SetThreadErrorMode(previous, null_mut());
+				winapi::um::errhandlingapi::SetThreadErrorMode(previous, null_mut());
 			},
 		}
 	}
 }
 
 unsafe fn get_win_error() -> IoError {
-	let error = kernel32::GetLastError();
+	let error = winapi::um::errhandlingapi::GetLastError();
 	if error == 0 {
 		IoError::new(
 			ErrorKind::Other,
@@ -121,7 +120,7 @@ unsafe fn get_win_error() -> IoError {
 
 #[inline]
 pub unsafe fn get_sym(handle: Handle, name: &CStr) -> Result<*mut (), Error> {
-	let symbol = kernel32::GetProcAddress(handle, name.as_ptr());
+	let symbol = winapi::um::libloaderapi::GetProcAddress(handle, name.as_ptr());
 	if symbol.is_null() {
 		Err(Error::SymbolGettingError(get_win_error()))
 	} else {
@@ -136,7 +135,7 @@ pub unsafe fn open_lib(name: &OsStr) -> Result<Handle, Error> {
 		Ok(val) => val,
 		Err(err) => return Err(Error::OpeningLibraryError(err)),
 	};
-	let handle = kernel32::LoadLibraryW(wide_name.as_ptr());
+	let handle = winapi::um::libloaderapi::LoadLibraryW(wide_name.as_ptr());
 	if handle.is_null() {
 		Err(Error::OpeningLibraryError(get_win_error()))
 	} else {
@@ -146,7 +145,7 @@ pub unsafe fn open_lib(name: &OsStr) -> Result<Handle, Error> {
 
 #[inline]
 pub fn close_lib(handle: Handle) -> Handle {
-	if unsafe { kernel32::FreeLibrary(handle) } == 0 {
+	if unsafe { winapi::um::libloaderapi::FreeLibrary(handle) } == 0 {
 		//this should not happen
 		panic!("FreeLibrary() failed, the error is {}", unsafe {
 			get_win_error()

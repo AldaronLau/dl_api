@@ -7,8 +7,6 @@
 //!
 //! It's the easiest, simplest and safest way to load dynamic libraries!
 
-#[cfg(windows)]
-extern crate kernel32;
 #[macro_use]
 extern crate lazy_static;
 #[cfg(unix)]

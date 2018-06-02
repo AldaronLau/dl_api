@@ -35,9 +35,8 @@
 		}
 
 		impl $sname {
-			unsafe fn new()
-				-> ::std::result::Result<Self, $crate::Error>
-			{
+			fn new() -> ::std::result::Result<Self, $crate::Error> {
+				unsafe {
 				let __lib = $crate::Library::new($l)?;
 				Ok(Self{
 					$($fname: {
@@ -49,6 +48,7 @@
 					)*
 					__lib,
 				})
+				}
 			}
 		}
 	);
