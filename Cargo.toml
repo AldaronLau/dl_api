@@ -1,0 +1,40 @@
+# "dl_api" crate - Licensed under the MIT LICENSE
+#  * Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+#                             _        _
+#                            /@\——————/@\
+# .———  .                   |   o    o   |     .————      .            .
+# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   .
+# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   |
+# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /
+# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |
+# |     |   ———   |       |                |    ————  |   | :——— :———  |   |
+#                 |        \              /                              __/
+#                           ¯————————————¯
+
+[package]
+name = "dl_api"
+version = "0.1.0"
+authors = [
+	"Jeron A. Lau <jeron.lau@plopgrizzly.com>"
+]
+
+license = "MIT"
+documentation = "https://docs.rs/dl_api"
+homepage = "http://plopgrizzly.com/dl_api"
+repository = "https://github.com/plopgrizzly/dl_api"
+
+readme = "readme.md"
+description = "A small, simple, safe-ish dynamic loading library for loading C libraries from Rust."
+keywords = ["dlopen", "dll", "so", "dylib", "shared"]
+categories = ["api-bindings", "external-ffi-bindings", "os::unix-apis", "os::windows-apis"]
+
+exclude = ["examples/*", ".gitignore", "_config.yml", "changelog.md"]
+
+[dependencies]
+lazy_static = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "libloaderapi", "winerror", "minwindef", "errhandlingapi"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
