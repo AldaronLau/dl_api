@@ -1,5 +1,8 @@
-// "dl_api" crate - Licensed under the MIT LICENSE
-//  * Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+// dl_api
+//
+// Copyright (c) 2018 Jeron A. Lau
+// Copyright (c) 2017 Szymon Wieloch
+// Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
 
 use std::error::Error as ErrorTrait;
 use std::fmt::{Display, Formatter, Result as FmtResult};
@@ -55,6 +58,12 @@ impl Display for Error {
 			}
 			&Error::NullSymbol | &Error::NullCharacter(_) => Ok(()),
 		}
+	}
+}
+
+impl From<Error> for String {
+	fn from(error: Error) -> Self {
+		format!("{}", error)
 	}
 }
 
