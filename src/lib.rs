@@ -14,9 +14,10 @@ extern crate libc;
 #[cfg(windows)]
 extern crate winapi;
 
-mod library;
-mod error;
 mod dl_api;
+mod error;
+mod library;
 
-#[doc(hidden)] pub use library::Library; // Use in dl_api only.
-pub use error::Error;
+pub use crate::error::Error;
+#[doc(hidden)]
+pub use crate::library::Library; // Use in dl_api only.

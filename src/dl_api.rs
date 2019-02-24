@@ -19,7 +19,8 @@
 /// 	};
 /// }
 /// ```
-#[macro_export] macro_rules! dl_api(
+#[macro_export]
+macro_rules! dl_api(
 	($sname: ident, $l: expr, $(fn $fname: ident($($farg: ty),*) -> $fret:ty),*) =>
 	(
 		#[allow(non_snake_case)]
