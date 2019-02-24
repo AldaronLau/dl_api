@@ -1,6 +1,6 @@
 # dl_api
 #
-# Copyright (c) 2018 Jeron A. Lau
+# Copyright (c) 2018-2019 Jeron A. Lau
 # Copyright (c) 2017 Szymon Wieloch
 # Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
 #                             _        _
@@ -27,8 +27,8 @@ documentation = "https://docs.rs/dl_api"
 homepage = "http://plopgrizzly.com/dl_api"
 repository = "https://github.com/plopgrizzly/dl_api"
 
-readme = "readme.md"
-description = "A small, simple, safe-ish dynamic loading library for loading C libraries from Rust."
+readme = "README.md"
+description = "The easiest, simplest and safest way to load dynamic (shared object) libraries from Rust!"
 keywords = ["dlopen", "dll", "so", "dylib", "shared"]
 categories = ["api-bindings", "external-ffi-bindings", "os::unix-apis", "os::windows-apis"]
 

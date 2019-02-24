@@ -1,18 +1,15 @@
 // dl_api
 //
-// Copyright (c) 2018 Jeron A. Lau
+// Copyright (c) 2018-2019 Jeron Aldaron Lau
 // Copyright (c) 2017 Szymon Wieloch
 // Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
 
-/// Create a struct laying out the api:
+/// Macro to generate the API struct.
 ///
 /// ```
-/// #[macro_use]
-/// extern crate dl_api;
-///
-/// dl_api!(MyApi, "libmylibrary.so.1" // or "mylibrary-1.dll" or "libMyLibrary.dylib"
-/// 	fn cFunction(FirstParamType) -> ReturnType
-/// );
+/// dl_api::link!(MyApi, "libmylibrary.so.1", {
+/// 	fn cFunction(param_name: ParamType) -> ReturnType;
+/// });
 ///
 /// fn main() {
 /// 	let api = MyApi::new().unwrap(); // unwrap the `Result`.
@@ -23,8 +20,8 @@
 /// }
 /// ```
 #[macro_export]
-macro_rules! dl_api(
-	($sname: ident, $l: expr, $(fn $fname: ident($($farg: ty),*) -> $fret:ty),*) =>
+macro_rules! link(
+	($sname: ident, $l: expr, { $(fn $fname: ident($($sarg: ident: $farg: ty),* $(,)?) -> $fret:ty);* $(;)? }) =>
 	(
 		#[allow(non_snake_case)]
 		pub struct $sname {
@@ -55,5 +52,5 @@ macro_rules! dl_api(
 				}
 			}
 		}
-	);
+	)
 );

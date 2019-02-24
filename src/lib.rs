@@ -8,7 +8,26 @@
 //! files.  It's based off of `rust-dlopen`.  A lot of simplifications have
 //! been made.
 //!
-//! It's the easiest, simplest and safest way to load dynamic libraries!
+//! It's the easiest, simplest and safest way to load dynamic (shared object) libraries!
+//!
+//! # Getting Started: Example
+//! The code inside of the curly braces for `link!()` matches exactly with code inside of the curly
+//! braces for `extern "C"`.  This makes it easy for you to turn your `extern "C"`s into `link!()`s.
+//! ```
+//! // Shared object: either "libmylibrary.so.1", "mylibrary-1.dll" or "libMyLibrary.dylib"
+//! dl_api::link!(MyApi, "libmylibrary.so.1", {
+//! 	fn cFunction(param_name: ParamType) -> ReturnType;
+//! });
+//!
+//! fn main() {
+//! 	let api = MyApi::new().unwrap(); // unwrap the `Result`.
+//!
+//! 	let rtn: ReturnType = unsafe {
+//! 		(api.cFunction)(0);
+//! 	};
+//! }
+//! ```
+//! 
 
 #[macro_use]
 extern crate lazy_static;
