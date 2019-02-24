@@ -1,22 +1,31 @@
-# dl_api
-A small, simple, safe-ish dynamic loading library for loading C libraries from Rust.
+# [dl_api](https://crates.io/crates/dl_api)
+A small, simple, safe-ish dynamic loading library for loading C libraries from
+Rust.
 
-[Cargo](https://crates.io/crates/dl_api) /
-[Documentation](https://docs.rs/dl_api) /
-[Change Log](http://plopgrizzly.com/dl_api/changelog.html)
+## Features
+* Macro to create a structure that dynamically loads a C API
+* Works on Unix and Windows
 
-## Supports
-* Windows
-* Unix
+## [Contributing](http://plopgrizzly.com/contributing/en#contributing)
 
-## Roadmap to 1.0
+## Roadmap to 1.0 (Future Features)
 * Make it easier to load parts of API at any time.
 * Support Nintendo Switch (for the asi_vulkan crate).
 * Probably support some other OS's.
 * Different loading macro for Rust ABI / other ABIS (possible ABI parameter to the macro?)
 * Make sure it's perfect.
 
-# Contributing
-If you'd like to help implement functions for unsupported platforms, fix bugs,
-improve the API or improve the Documentation, then contact me at
-jeron.lau@plopgrizzly.com. I'll appreciate any help.
+## Change Log
+### 0.2
+* `String` now implements `From<dl_api::Error>`.
+
+### 0.1
+* Initial version
+* Have 1 API based on wrapper from `rust-dlopen`
+* Use regular macros, rather than procedural macros
+* Simplified Container API
+* Allow non\_snake\_case function names in API structs.
+* Function types are automatically prepended with `unsafe extern "system"` for
+making type definitions platform-independant.
+
+## Developed by [Plop Grizzly](http://plopgrizzly.com)

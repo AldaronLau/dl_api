@@ -1,5 +1,8 @@
-// "dl_api" crate - Licensed under the MIT LICENSE
-//  * Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+// dl_api
+//
+// Copyright (c) 2018 Jeron A. Lau
+// Copyright (c) 2017 Szymon Wieloch
+// Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
 
 //! `dl_api` is a library for dynamically loading API's from .dll/.so/.dylib
 //! files.  It's based off of `rust-dlopen`.  A lot of simplifications have
@@ -14,9 +17,10 @@ extern crate libc;
 #[cfg(windows)]
 extern crate winapi;
 
-mod library;
-mod error;
 mod dl_api;
+mod error;
+mod library;
 
-#[doc(hidden)] pub use library::Library; // Use in dl_api only.
-pub use error::Error;
+pub use crate::error::Error;
+#[doc(hidden)]
+pub use crate::library::Library; // Use in dl_api only.
