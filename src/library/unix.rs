@@ -1,5 +1,8 @@
-// "dl_api" crate - Licensed under the MIT LICENSE
-//  * Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+// dl_api
+//
+// Copyright (c) 2018 Jeron A. Lau
+// Copyright (c) 2017 Szymon Wieloch
+// Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
 
 use libc::{c_int, c_void, dlclose, dlerror, dlopen, dlsym, RTLD_LAZY, RTLD_LOCAL};
 use std::ffi::{CStr, OsStr};
