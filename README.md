@@ -1,4 +1,4 @@
-# ![](https://free.plopgrizzly.com/dl_api/icon.svg) dl_api
+# ![DL_API](https://free.plopgrizzly.com/dl_api/icon.svg)
 The easiest, simplest and safest way to load dynamic (shared object) libraries from Rust!
 
 ## Features
