@@ -1,8 +1,9 @@
 # dl_api
 #
-# Copyright (c) 2018-2019 Jeron A. Lau
-# Copyright (c) 2017 Szymon Wieloch
-# Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
+# Copyright © 2018-2019 Jeron Aldaron Lau
+# Dual-licensed under either the MIT License or the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_BSL.txt or copy at https://www.boost.org/LICENSE_1_0.txt, and
+# accompanying file LICENSE_MIT.txt or copy at https://opensource.org/licenses/MIT)
 #                             _        _
 #                            /@\——————/@\
 # .———  .                   |   o    o   |     .————      .            .
@@ -16,15 +17,15 @@
 
 [package]
 name = "dl_api"
-version = "0.3.0"
+version = "0.3.1"
 authors = [
 	"Jeron Aldaron Lau <jeronaldaron@gmail.com>"
 ]
 edition = "2018"
 
-license = "MIT"
+license = "MIT / BSL-1.0"
 documentation = "https://docs.rs/dl_api"
-homepage = "http://plopgrizzly.com/dl_api"
+homepage = "https://free.plopgrizzly.com/dl_api/"
 repository = "https://github.com/plopgrizzly/dl_api"
 
 readme = "README.md"

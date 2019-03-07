@@ -1,9 +1,3 @@
-// dl_api
-//
-// Copyright (c) 2018 Jeron A. Lau
-// Copyright (c) 2017 Szymon Wieloch
-// Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
-
 use std::convert::From;
 use std::error::Error as ErrorTrait;
 use std::ffi::NulError;

@@ -1,9 +1,3 @@
-// dl_api
-//
-// Copyright (c) 2018-2019 Jeron Aldaron Lau
-// Copyright (c) 2017 Szymon Wieloch
-// Distributed under the MIT LICENSE (See accompanying file LICENSE.txt)
-
 /// Macro to generate the API struct.
 ///
 /// ```no_run

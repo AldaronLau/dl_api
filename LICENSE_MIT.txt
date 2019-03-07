@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2018 Jeron A. Lau
+Copyright (c) 2018-2019 Jeron Aldaron Lau
+
 Copyright (c) 2017 Szymon Wieloch
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

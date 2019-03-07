@@ -1,3 +1,6 @@
+# dl_api 0.3.1
+* Fixed breaking from edition changes for Windows (Fix not compiling on Windows).
+
 # dl_api 0.3.0
 * Macro `dl_api!()` renamed to `link!()`.
 * The `link!()` macro now takes in the same syntax as an `extern` block.
