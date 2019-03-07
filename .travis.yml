@@ -26,9 +26,9 @@ matrix:
     - os: windows
       rust: nightly
 
-    - os: macos
+    - os: osx
       rust: stable
-    - os: macos
+    - os: osx
       rust: beta
-    - os: macos
+    - os: osx
       rust: nightly
