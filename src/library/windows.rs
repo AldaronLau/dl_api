@@ -11,7 +11,7 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 use std::sync::Mutex;
 use winapi;
-use Error;
+use crate::Error;
 
 static USE_ERRORMODE: AtomicBool = ATOMIC_BOOL_INIT;
 
