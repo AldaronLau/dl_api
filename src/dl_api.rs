@@ -6,16 +6,17 @@
 
 /// Macro to generate the API struct.
 ///
-/// ```
+/// ```no_run
+/// // Shared object: either "libmylibrary.so.1", "mylibrary-1.dll" or "libMyLibrary.dylib"
 /// dl_api::link!(MyApi, "libmylibrary.so.1", {
-/// 	fn cFunction(param_name: ParamType) -> ReturnType;
+/// 	fn cFunction(param_name: *mut u32) -> u32;
 /// });
 ///
 /// fn main() {
 /// 	let api = MyApi::new().unwrap(); // unwrap the `Result`.
 ///
-/// 	let rtn: ReturnType = unsafe {
-/// 		(api.cFunction)(0);
+/// 	let rtn: u32 = unsafe {
+/// 		(api.cFunction)(std::ptr::null_mut())
 /// 	};
 /// }
 /// ```

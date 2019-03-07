@@ -13,17 +13,17 @@
 //! # Getting Started: Example
 //! The code inside of the curly braces for `link!()` matches exactly with code inside of the curly
 //! braces for `extern "C"`.  This makes it easy for you to turn your `extern "C"`s into `link!()`s.
-//! ```
+//! ```no_run
 //! // Shared object: either "libmylibrary.so.1", "mylibrary-1.dll" or "libMyLibrary.dylib"
 //! dl_api::link!(MyApi, "libmylibrary.so.1", {
-//! 	fn cFunction(param_name: ParamType) -> ReturnType;
+//! 	fn cFunction(param_name: *mut u32) -> u32;
 //! });
 //!
 //! fn main() {
 //! 	let api = MyApi::new().unwrap(); // unwrap the `Result`.
 //!
-//! 	let rtn: ReturnType = unsafe {
-//! 		(api.cFunction)(0);
+//! 	let rtn: u32 = unsafe {
+//! 		(api.cFunction)(std::ptr::null_mut())
 //! 	};
 //! }
 //! ```
