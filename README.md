@@ -1,4 +1,6 @@
 # ![DL_API](https://free.plopgrizzly.com/dl_api/icon.svg)
+[![Build Status](https://travis-ci.com/plopgrizzly/dl_api.svg?branch=master)](https://travis-ci.com/plopgrizzly/dl_api)
+
 The easiest, simplest and safest way to load dynamic (shared object) libraries from Rust!
 
 ## Features
