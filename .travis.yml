@@ -29,10 +29,13 @@ matrix:
       - os: osx
         rust: stable
 
-notifications:
-    webhooks:
-        urls:
-          - https://discordapp.com/api/webhooks/553333800399142913/nT2QIt54TDjh2uxjWUNb7aZvuVW8Nx7OkUHcb7F3N3bMCiKmR9QoFmEmLbDoNC5rcigU
-        on_success: always
-        on_failure: always
-        on_start: always
+after_success:
+  - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+  - chmod +x send.sh
+  - ./send.sh success $WEBHOOK_URL
+
+after_failure:
+  - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+  - chmod +x send.sh
+  - ./send.sh failure $WEBHOOK_URL
+
