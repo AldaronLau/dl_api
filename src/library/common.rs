@@ -1,5 +1,5 @@
-use std::ffi::{CStr, CString, OsStr};
 use crate::Error;
+use std::ffi::{CStr, CString, OsStr};
 
 //choose the right platform implementation here
 #[cfg(unix)]

@@ -1,3 +1,4 @@
+use crate::Error;
 use std::ffi::{CStr, OsStr};
 use std::io::{Error as IoError, ErrorKind};
 use std::os::windows::ffi::OsStrExt;
@@ -5,7 +6,6 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 use std::sync::Mutex;
 use winapi;
-use crate::Error;
 
 static USE_ERRORMODE: AtomicBool = ATOMIC_BOOL_INIT;
 

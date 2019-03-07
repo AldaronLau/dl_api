@@ -56,9 +56,9 @@ impl Display for Error {
 }
 
 impl From<Error> for String {
-	fn from(error: Error) -> Self {
-		format!("{}", error)
-	}
+    fn from(error: Error) -> Self {
+        format!("{}", error)
+    }
 }
 
 impl From<NulError> for Error {

@@ -1,26 +1,45 @@
 language: rust
+sudo: false
+
 cache: cargo
+cache:
+    directories:
+      - $HOME/.cargo
+      - $HOME/target
+
+before-cache:
+  - rm -rf $HOME/.cargo/registry
+
 rust:
   - stable
   - beta
   - nightly
+
 matrix:
-  allow_failures:
-    - rust: nightly
-  fast_finish: true
-  include:
-    - os: linux
-      rust: stable
-      compiler: gcc
-    - os: linux
-      rust: beta
-      compiler: gcc
-    - os: linux
-      rust: nightly
-      compiler: gcc
+    allow_failures:
+      - rust: nightly
+    fast_finish: true
+    include:
+      - os: linux
+        rust: stable
+        compiler: gcc
+      - os: linux
+        rust: beta
+        compiler: gcc
+      - os: linux
+        rust: nightly
+        compiler: gcc
 
-    - os: windows
-      rust: stable
+      - os: windows
+        rust: stable
 
-    - os: osx
-      rust: stable
+      - os: osx
+        rust: stable
+
+notifications:
+    webhooks:
+        urls:
+          - https://discordapp.com/api/webhooks/553333800399142913/nT2QIt54TDjh2uxjWUNb7aZvuVW8Nx7OkUHcb7F3N3bMCiKmR9QoFmEmLbDoNC5rcigU
+        on_success: always
+        on_failure: always
+        on_start: always

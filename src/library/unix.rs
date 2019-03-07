@@ -1,9 +1,9 @@
+use crate::Error;
 use libc::{c_int, c_void, dlclose, dlerror, dlopen, dlsym, RTLD_LAZY, RTLD_LOCAL};
 use std::ffi::{CStr, OsStr};
 use std::io::{Error as IoError, ErrorKind};
 use std::os::unix::ffi::OsStrExt;
 use std::ptr::null_mut;
-use crate::Error;
 
 const DEFAULT_FLAGS: c_int = RTLD_LOCAL | RTLD_LAZY;
 
