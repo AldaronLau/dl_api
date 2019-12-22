@@ -40,5 +40,5 @@ fn main() {
 * [Website](https://lordaldaron.github.io/dl_api)
 * [Cargo](https://crates.io/crates/dl_api)
 * [Documentation](https://docs.rs/dl_api)
-* [Change Log](https://free.plopgrizzly.com/dl_api/changelog)
+* [Change Log](https://lordaldaron.github.io/dl_api/changelog)
 * [Code of Conduct](https://lordaldaron.github.io/dl_api/codeofconduct)
