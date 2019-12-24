@@ -1,0 +1,61 @@
+:::
+## Union list.
+union: list record
+  ## Name of Rust enum to make from this union.
+  name: text
+  ## Associated #[repr(C)] enum name.
+  enum: text
+  ## List of variants.
+  variant: list record
+    ## Type associated with this variant of the enum.
+    type: text
+## Enum list.
+enum: list record
+  ## Name of #[repr(C)] enum.
+  name: text
+  ## Optional type of enum besides default.
+  type: optional text
+  ## A list of variants of enum.
+  variant: list record
+    ## Variant name
+    name: text
+    ## Variant value
+    value: int
+## Struct list
+struct: list record
+  ## Name of #[repr(C)] struct
+  name: text
+  ## A list of fields in the struct.  Leave empty for reference-only structs.
+  field: list record Param
+    ## Parameter name.
+    name: text
+    ## Parameter attribute.
+    ## - `Val`: Input, pass-by-value (copy).
+    ## - `Out`: Output, pointer to uninitialized data to be initialized.
+    ## - `Mut`: Input-Output, initialized reference that may change.
+    ## - `Ref`: Input, pass-by-reference, initialized memory that won't change.
+    ## - `Old`: Input, pass-by-reference, and free all.
+    ## - `Eat`: Input, pass-by-value (copy), and free all.
+    ## - `Inv`: Input, pass-by-reference, and free fields but not struct itself.
+    ## - `Len`: Input, pass-by-value (must use with Arr).
+    ## - `Err`: Output, pointer to uninitialized error data to be initialized.
+    ## - `Opt`: Modifier on references - use NULL for None.
+    ## - `Arr`: Modifier on references - multiple.
+    attr: text
+    ## Parameter type.
+    type: text
+## Function list.
+func: list record
+  ## Function symbol name.
+  sym: text
+  ## C Module name.
+  mod: text
+  ## Documentation of function from C API (optionally modify for Rust API).
+  doc: text
+  ## Optional return value from return type of function (can't use with `err`).
+  ret: optional text
+  ## Optional error type from return type of function (can't use with `ret`).
+  err: optional text
+  ## Parameter.
+  par: list record Param
+:::
