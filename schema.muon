@@ -3,6 +3,8 @@
 union: list record
   ## Name of Rust enum to make from this union.
   name: text
+  ## Documentation of union from C API (optionally modify for Rust API).
+  doc: optional text
   ## Associated #[repr(C)] enum name.
   enum: text
   ## List of variants.
@@ -13,18 +15,24 @@ union: list record
 enum: list record
   ## Name of #[repr(C)] enum.
   name: text
+  ## Documentation of enum from C API (optionally modify for Rust API).
+  doc: optional text
   ## Optional type of enum besides default.
   type: optional text
   ## A list of variants of enum.
   variant: list record
     ## Variant name
     name: text
+    ## Documentation of variant from C API (optionally modify for Rust API).
+    doc: optional text
     ## Variant value
-    value: int
+    value: optional int
 ## Struct list
 struct: list record
   ## Name of #[repr(C)] struct
   name: text
+  ## Documentation of struct from C API (optionally modify for Rust API).
+  doc: optional text
   ## A list of fields in the struct.  Leave empty for reference-only structs.
   field: list record Param
     ## Parameter name.
@@ -51,7 +59,7 @@ func: list record
   ## C Module name.
   mod: text
   ## Documentation of function from C API (optionally modify for Rust API).
-  doc: text
+  doc: optional text
   ## Optional return value from return type of function (can't use with `err`).
   ret: optional text
   ## Optional error type from return type of function (can't use with `ret`).
