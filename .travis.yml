@@ -7,9 +7,6 @@ cache:
       - $HOME/.cargo
       - $HOME/target
 
-before-cache:
-  - rm -rf $HOME/.cargo/registry
-
 rust:
   - beta
   - nightly
@@ -29,13 +26,10 @@ matrix:
       - os: osx
         rust: stable
 
-after_success: always
-  - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-  - chmod +x send.sh
-  - ./send.sh success $WEBHOOK_URL
+script:
+  - cargo update
+  - cargo test --all --all-features
 
-after_failure: change
-  - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-  - chmod +x send.sh
-  - ./send.sh failure $WEBHOOK_URL
-
+notifications:
+  webhooks:
+    - https://cala.zulipchat.com/api/v1/external/travis?api_key=dCMe2lR9z6lOfH1ucaZagWphH6p4TumS&stream=travis-ci&topic=dl_api&ignore_pull_requests=false
