@@ -27,6 +27,16 @@ enum: list record
     doc: optional text
     ## Variant value
     value: optional int
+## Struct address list (`void *`).  Must be a Ref, Mut, or New
+address: list record
+  ## Name of tuple struct
+  name: text
+  ## Documentation of struct from C API (optionally modify for Rust API).
+  doc: optional text
+  ## Associated struct - if left out, then struct is opaque
+  struct: optional text
+  ## Associated desconstructor
+  old: optional text
 ## Struct list
 struct: list record
   ## Name of #[repr(C)] struct
@@ -40,6 +50,7 @@ struct: list record
     ## Parameter attribute.
     ## - `Val`: Input, pass-by-value (copy).
     ## - `Out`: Output, pointer to uninitialized data to be initialized.
+    ## - `New`: Output, pointer to uninitialized pointer to be allocated.
     ## - `Mut`: Input-Output, initialized reference that may change.
     ## - `Ref`: Input, pass-by-reference, initialized memory that won't change.
     ## - `Old`: Input, pass-by-reference, and free all.
@@ -47,23 +58,30 @@ struct: list record
     ## - `Inv`: Input, pass-by-reference, and free fields but not struct itself.
     ## - `Len`: Input, pass-by-value (must use with Arr).
     ## - `Err`: Output, pointer to uninitialized error data to be initialized.
+    ## - `Txt`: Use integer value as length for a .text parameter
     ## - `Opt`: Modifier on references - use NULL for None.
     ## - `Arr`: Modifier on references - multiple.
-    attr: text
-    ## Parameter type.
+    attr: list text
+    ## Parameter type.  Special types:
+    ## - `.textz`: String slice in Rust, 0-terminated utf8/ascii in C.
+    ## - `.text`: String slice in Rust, passed w/ length to C. 
     type: text
 ## Function list.
 func: list record
   ## Function symbol name.
   sym: text
   ## C Module name.
-  mod: text
+  mod: list text
   ## Documentation of function from C API (optionally modify for Rust API).
   doc: optional text
   ## Optional return value from return type of function (can't use with `err`).
   ret: optional text
   ## Optional error type from return type of function (can't use with `ret`).
-  err: optional text
+  err: optional record
+    ## Type
+    type: text
+    ## Success value
+    success: text
   ## Parameter.
   par: list record Param
 :::
