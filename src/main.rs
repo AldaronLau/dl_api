@@ -1,8 +1,8 @@
-use std::fs::File;
-use std::path::Path;
+use heck::CamelCase;
 use muon_rs as muon;
 use serde::{Deserialize, Serialize};
-use heck::CamelCase;
+use std::fs::File;
+use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 struct UnionVariant {
@@ -11,7 +11,7 @@ struct UnionVariant {
 
 #[derive(Serialize, Deserialize)]
 struct Union {
-    name: String,   
+    name: String,
     doc: Option<String>,
     r#enum: String,
     variant: Vec<UnionVariant>,
@@ -92,6 +92,7 @@ fn convert(spec: &SafeFFI, mut out: String) -> String {
 
     // FIXME: Unions
 
+    // Enums
     for en in &spec.r#enum {
         if let Some(ref doc) = en.doc {
             out.push_str("/// ");
@@ -103,7 +104,7 @@ fn convert(spec: &SafeFFI, mut out: String) -> String {
             out.push_str(ty);
             out.push_str(")]\n");
         }
-        out.push_str("#[repr(C)]\npub(crate) enum ");
+        out.push_str("#[repr(C)]\n#[non_exhaustive]\npub(crate) enum ");
         if en.name.ends_with("_t") {
             out.push_str(&en.name[..en.name.len() - 2].to_camel_case());
         } else {
@@ -129,6 +130,37 @@ fn convert(spec: &SafeFFI, mut out: String) -> String {
         out.push_str("}\n\n");
     }
 
+    // Addresses
+    for ad in &spec.address {
+        if let Some(ref doc) = ad.doc {
+            out.push_str("/// ");
+            out.push_str(&doc.replace("\n", "\n/// "));
+            out.push_str("\n");
+        }
+
+        out.push_str("#[repr(C)]\npub struct ");
+        out.push_str(&ad.name);
+        out.push_str("(*mut ");
+        if let Some(ref record) = ad.r#struct {
+            out.push_str(record);
+        } else {
+            out.push_str("c_void");
+        }
+        out.push_str(");\n\n");
+
+        if let Some(ref old) = ad.old {
+            out.push_str("impl Drop for ");
+            out.push_str(&ad.name);
+            out.push_str(" {\n    fn drop(&mut self) {\n        ");
+            out.push_str(old);
+            out.push_str("(self.0);\n    }\n}\n\n");
+        }
+    }
+
+    // FIXME: Structs
+
+    // FIXME: Functions
+
     out
 }
 
@@ -141,7 +173,8 @@ fn main() {
     let cx: SafeFFI = muon::from_reader(File::open(&src).unwrap_or_else(|e| {
         eprintln!("Couldn't open file: '{}': {}!", src, e);
         std::process::exit(1);
-    })).unwrap_or_else(|e| {
+    }))
+    .unwrap_or_else(|e| {
         eprintln!("Invalid file format: \"{}\"", e);
         std::process::exit(2);
     });
