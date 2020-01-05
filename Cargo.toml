@@ -39,6 +39,7 @@ exclude = ["examples/*", ".gitignore", "_config.yml", "changelog.md"]
 lazy_static = "0.2"
 muon-rs = "0.2"
 serde = { version = "1.0", features = ["derive"] }
+heck = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "libloaderapi", "winerror", "minwindef", "errhandlingapi"] }
