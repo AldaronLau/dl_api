@@ -104,7 +104,11 @@ fn convert(spec: &SafeFFI, mut out: String) -> String {
             out.push_str(")]\n");
         }
         out.push_str("#[repr(C)]\npub(crate) enum ");
-        out.push_str(&en.name);
+        if en.name.ends_with("_t") {
+            out.push_str(&en.name[..en.name.len() - 2].to_camel_case());
+        } else {
+            out.push_str(&en.name.to_camel_case());
+        }
         out.push_str(" {\n");
 
         for variant in &en.variant {
