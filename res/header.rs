@@ -10,7 +10,8 @@ const LM_ID_NEWLM: c_long = -1;
 const RTLD_NOW: c_int = 0x00002;
 
 extern {
-    fn dlmopen(lmid: c_long, filename: *const c_char, flags: c_int) -> *mut c_void;
+    fn dlmopen(lmid: c_long, filename: *const c_char, flags: c_int)
+        -> *mut c_void;
     fn dlclose(handle: *mut c_void) -> c_int;
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
 }
@@ -25,5 +26,21 @@ unsafe fn old(dll: NonNull<c_void>) {
 
 unsafe fn sym(dll: &NonNull<c_void>, name: &[u8]) -> Option<NonNull<c_void>> {
     NonNull::new(dlsym(dll, name.as_ptr().cast()))
+}
+
+static mut THREAD_ID: std::mem::MaybeUninit<std::thread::ThreadID>
+    = std::mem::MaybeUninit::uninit();
+static mut DLL: std::mem::MaybeUninit<NonNull<c_void>>;
+static mut START_FFI: std::sync::Once = std::sync::Once::new();
+
+unsafe fn check_thread() -> Option<NonNull<c_void>> {
+    START_FFI.call_once(||
+        THREAD_ID = std::mem::MaybeUninit::new(std::thread::current().id());
+        if let Some(dll) = new(DL_API_SHARED_OBJECT_NAME) {
+            DLL = dll;
+        }
+    );
+
+    assert_eq!(THREAD_ID.assume_init(), std::thread::current().id());
 }
 
