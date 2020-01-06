@@ -163,27 +163,24 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
     // FIXME: Structs
 
+    // Functions
     struct Module {
         // The name of the struct that represents the module.
         name: String,
         // Rust extern "C" functions' names, types and symbol.
         c_fn: Vec<Func>,
     }
-
     impl std::cmp::PartialEq for Module {
         fn eq(&self, other: &Module) -> bool {
             self.name == other.name
         }
     }
-
     impl std::cmp::Eq for Module {}
-
     impl std::cmp::PartialOrd for Module {
         fn partial_cmp(&self, other: &Module) -> Option<std::cmp::Ordering> {
             Some(self.cmp(other))
         }
     }
-
     impl std::cmp::Ord for Module {
         fn cmp(&self, other: &Module) -> std::cmp::Ordering {
             self.name.cmp(&other.name)
@@ -203,8 +200,6 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str(&global);
         out.push_str(": std::mem::MaybeUninit<extern fn(\n    ");
 
-        let mut new = None;
-
         for param in &func.par {
             if param.attr.len() == 2 {
                 match param.attr.first().unwrap().as_str() {
@@ -217,48 +212,82 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 }
             }
 
+            let typ = param.r#type
+                .replace(" ", "_")
+                .to_camel_case()
+                .replace(".Textz", "std::os::raw::c_char")
+                .replace("Uint8T", "u8")
+                .replace("Int8T", "i8")
+                .replace("Uint16T", "u8")
+                .replace("Int16T", "i16")
+                .replace("Uint32T", "u32")
+                .replace("Int32T", "i32")
+                .replace("Uint64T", "u64")
+                .replace("Int64T", "i64")
+                .replace("UnsignedChar", "std::os::raw::c_uchar")
+                .replace("SignedChar", "std::os::raw::c_schar")
+                .replace("Char", "std::os::raw::c_char")
+                .replace("UnsignedShort", "std::os::raw::c_ushort")
+                .replace("Short", "std::os::raw::c_short")
+                .replace("UnsignedInt", "std::os::raw::c_uint")
+                .replace("Int", "std::os::raw::c_int")
+                .replace("UnsignedLongLong", "std::os::raw::c_ulonglong")
+                .replace("LongLong", "std::os::raw::c_longlong")
+                .replace("UnsignedLong", "std::os::raw::c_ulong")
+                .replace("Long", "std::os::raw::c_long")
+                .replace("Double", "std::os::raw::c_double")
+                .replace("Float", "std::os::raw::c_float");
+
             match param.attr.last().unwrap().as_str() {
                 // Input, pass-by-value (copy).
                 "Val" => {
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 },
                 // Output, pointer to uninitialized data to be initialized.
-                "Out" => new = Some(param.r#type.clone()),
+                "Out" => {
+                    out.push_str("*mut ");
+                    out.push_str(&typ);
+                    out.push_str(", ");
+                },
                 // Output, pointer to uninitialized pointer to be allocated.
-                "New" => new = Some(param.r#type.clone()),
+                "New" => {
+                    out.push_str("*mut *mut ");
+                    out.push_str(&typ);
+                    out.push_str(", ");
+                },
                 // Input-Output, initialized reference that may change.
                 "Mut" => {
                     out.push_str("*mut ");
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 }
                 // Input, pass-by-reference, initialized memory that won't change.
                 "Ref" => {
                     out.push_str("*const ");
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 }
                 // Input, pass-by-reference, and free all.
                 "Old" => {
                     out.push_str("*mut ");
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 },
                 // Input, pass-by-value (copy), and free all.
                 "Eat" => {
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 },
                 // Input, pass-by-reference, and free fields but not struct itself.
                 "Inv" => {
                     out.push_str("*const ");
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 }
                 // Input, pass-by-value (must use with Arr).
                 "Len" => {
-                    out.push_str(&param.r#type);
+                    out.push_str(&typ);
                     out.push_str(", ");
                 },
                 // Output, pointer to uninitialized error data to be initialized.
@@ -346,43 +375,45 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     }
                 }
 
+                let typ = param.r#type.replace(".textz", "std::ffi::CStr");
+
                 match param.attr.last().unwrap().as_str() {
                     // Input, pass-by-value (copy).
                     "Val" => {
-                        out.push_str(&param.r#type);
+                        out.push_str(&typ);
                         out.push_str(end);
                     },
                     // Output, pointer to uninitialized data to be initialized.
-                    "Out" => new = Some(param.r#type.clone()),
+                    "Out" => new = Some(typ.clone()),
                     // Output, pointer to uninitialized pointer to be allocated.
-                    "New" => new = Some(param.r#type.clone()),
+                    "New" => new = Some(typ.clone()),
                     // Input-Output, initialized reference that may change.
                     "Mut" => {
                         out.push_str("&mut ");
-                        out.push_str(&param.r#type);
+                        out.push_str(&typ);
                         out.push_str(end);
                     }
                     // Input, pass-by-reference, initialized memory that won't change.
                     "Ref" => {
                         out.push_str("&");
-                        out.push_str(&param.r#type);
+                        out.push_str(&typ);
                         out.push_str(end);
                     }
                     // Input, pass-by-reference, and free all.
                     "Old" => {
                         out.push_str("&mut ");
-                        out.push_str(&param.r#type);
+                        out.push_str(&typ);
                         out.push_str(end);
                     },
                     // Input, pass-by-value (copy), and free all.
                     "Eat" => {
-                        out.push_str(&param.r#type);
+                        out.push_str(&typ);
                         out.push_str(end);
                     }
                     // Input, pass-by-reference, and free fields but not struct itself.
                     "Inv" => {
                         out.push_str("&");
-                        out.push_str(&param.r#type);
+                        out.push_str(&typ);
                         out.push_str(end);
                     }
                     // Input, pass-by-value (must use with Arr).
