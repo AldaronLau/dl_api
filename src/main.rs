@@ -212,18 +212,24 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 }
             }
 
-            let typ = param.r#type
-                .replace(" ", "_")
-                .to_camel_case()
-                .replace(".Textz", "std::os::raw::c_char")
-                .replace("Uint8T", "u8")
-                .replace("Int8T", "i8")
-                .replace("Uint16T", "u8")
-                .replace("Int16T", "i16")
-                .replace("Uint32T", "u32")
-                .replace("Int32T", "i32")
-                .replace("Uint64T", "u64")
-                .replace("Int64T", "i64")
+            let typ = if param.r#type.ends_with("_t") {
+                param.r#type[..param.r#type.len() - 2]
+                    .replace(" ", "_")
+                    .to_camel_case()
+            } else {
+                param.r#type.replace(" ", "_").to_camel_case()
+            };
+
+            let typ = typ
+                .replace("Textz", "std::os::raw::c_char")
+                .replace("Uint8", "u8")
+                .replace("Int8", "i8")
+                .replace("Uint16", "u8")
+                .replace("Int16", "i16")
+                .replace("Uint32", "u32")
+                .replace("Int32", "i32")
+                .replace("Uint64", "u64")
+                .replace("Int64", "i64")
                 .replace("UnsignedChar", "std::os::raw::c_uchar")
                 .replace("SignedChar", "std::os::raw::c_schar")
                 .replace("Char", "std::os::raw::c_char")
@@ -301,9 +307,73 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str("\n) -> ");
 
         if let Some(ref ret) = func.ret {
-            out.push_str(ret);
+            let ret_typ = if ret.ends_with("_t") {
+                ret[..ret.len() - 2]
+                    .replace(" ", "_")
+                    .to_camel_case()
+            } else {
+                ret.replace(" ", "_").to_camel_case()
+            };
+
+            let ret_typ = ret_typ
+                .replace("Textz", "std::os::raw::c_char")
+                .replace("Uint8", "u8")
+                .replace("Int8", "i8")
+                .replace("Uint16", "u8")
+                .replace("Int16", "i16")
+                .replace("Uint32", "u32")
+                .replace("Int32", "i32")
+                .replace("Uint64", "u64")
+                .replace("Int64", "i64")
+                .replace("UnsignedChar", "std::os::raw::c_uchar")
+                .replace("SignedChar", "std::os::raw::c_schar")
+                .replace("Char", "std::os::raw::c_char")
+                .replace("UnsignedShort", "std::os::raw::c_ushort")
+                .replace("Short", "std::os::raw::c_short")
+                .replace("UnsignedInt", "std::os::raw::c_uint")
+                .replace("Int", "std::os::raw::c_int")
+                .replace("UnsignedLongLong", "std::os::raw::c_ulonglong")
+                .replace("LongLong", "std::os::raw::c_longlong")
+                .replace("UnsignedLong", "std::os::raw::c_ulong")
+                .replace("Long", "std::os::raw::c_long")
+                .replace("Double", "std::os::raw::c_double")
+                .replace("Float", "std::os::raw::c_float");
+
+            out.push_str(&ret_typ);
         } else if let Some(ref ret) = func.err {
-            out.push_str(&ret.r#type);
+            let ret_typ = if ret.r#type.ends_with("_t") {
+                ret.r#type[..ret.r#type.len() - 2]
+                    .replace(" ", "_")
+                    .to_camel_case()
+            } else {
+                ret.r#type.replace(" ", "_").to_camel_case()
+            };
+
+            let ret_typ = ret_typ
+                .replace("Textz", "std::os::raw::c_char")
+                .replace("Uint8", "u8")
+                .replace("Int8", "i8")
+                .replace("Uint16", "u8")
+                .replace("Int16", "i16")
+                .replace("Uint32", "u32")
+                .replace("Int32", "i32")
+                .replace("Uint64", "u64")
+                .replace("Int64", "i64")
+                .replace("UnsignedChar", "std::os::raw::c_uchar")
+                .replace("SignedChar", "std::os::raw::c_schar")
+                .replace("Char", "std::os::raw::c_char")
+                .replace("UnsignedShort", "std::os::raw::c_ushort")
+                .replace("Short", "std::os::raw::c_short")
+                .replace("UnsignedInt", "std::os::raw::c_uint")
+                .replace("Int", "std::os::raw::c_int")
+                .replace("UnsignedLongLong", "std::os::raw::c_ulonglong")
+                .replace("LongLong", "std::os::raw::c_longlong")
+                .replace("UnsignedLong", "std::os::raw::c_ulong")
+                .replace("Long", "std::os::raw::c_long")
+                .replace("Double", "std::os::raw::c_double")
+                .replace("Float", "std::os::raw::c_float");
+
+            out.push_str(&ret_typ);
         } else {
             out.push_str("()");
         }
@@ -375,7 +445,40 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     }
                 }
 
-                let typ = param.r#type.replace(".textz", "std::ffi::CStr");
+                let typ = if param.r#type.ends_with("_t") {
+                    param.r#type[..param.r#type.len() - 2]
+                        .replace(" ", "_")
+                        .to_camel_case()
+                } else {
+                    param.r#type.replace(" ", "_").to_camel_case()
+                };
+
+                let typ = typ
+                    .replace("Textz", "std::ffi::CStr")
+                    .replace("Uint8", "u8")
+                    .replace("Int8", "i8")
+                    .replace("Uint16", "u8")
+                    .replace("Int16", "i16")
+                    .replace("Uint32", "u32")
+                    .replace("Int32", "i32")
+                    .replace("Uint64", "u64")
+                    .replace("Int64", "i64")
+                    .replace("Size", "usize")
+                    .replace("Ssize", "isize")
+                    // Requires cast.
+                    .replace("UnsignedChar", "u8") // at least 8 bits
+                    .replace("SignedChar", "i8") // at least 8 bits
+                    .replace("Char", "u8") // at least 8 bits
+                    .replace("UnsignedShort", "u16") // at least 16 bits
+                    .replace("Short", "i16") // at least 16 bits
+                    .replace("UnsignedInt", "u16") // at least 16 bits
+                    .replace("Int", "i16") // at least 16 bits
+                    .replace("UnsignedLongLong", "u64") // at least 64 bis
+                    .replace("LongLong", "i64") // at least 64 bis
+                    .replace("UnsignedLong", "u32") // at least 32 bits
+                    .replace("Long", "i32") // at least 32 bits
+                    .replace("Double", "f64") // usually 64 bits
+                    .replace("Float", "f32"); // usually 32 bits
 
                 match param.attr.last().unwrap().as_str() {
                     // Input, pass-by-value (copy).
@@ -432,8 +535,78 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
             out.push_str(") -> ");
             if let Some(ref ret) = cfunc.ret {
-                out.push_str(ret);
+                let ret_typ = if ret.ends_with("_t") {
+                    ret[..ret.len() - 2]
+                        .replace(" ", "_")
+                        .to_camel_case()
+                } else {
+                    ret.replace(" ", "_").to_camel_case()
+                };
+
+                let ret_typ = ret_typ
+                    .replace("Textz", "std::ffi::CStr")
+                    .replace("Uint8", "u8")
+                    .replace("Int8", "i8")
+                    .replace("Uint16", "u8")
+                    .replace("Int16", "i16")
+                    .replace("Uint32", "u32")
+                    .replace("Int32", "i32")
+                    .replace("Uint64", "u64")
+                    .replace("Int64", "i64")
+                    .replace("Size", "usize")
+                    .replace("Ssize", "isize")
+                    // Requires cast.
+                    .replace("UnsignedChar", "u8") // at least 8 bits
+                    .replace("SignedChar", "i8") // at least 8 bits
+                    .replace("Char", "u8") // at least 8 bits
+                    .replace("UnsignedShort", "u16") // at least 16 bits
+                    .replace("Short", "i16") // at least 16 bits
+                    .replace("UnsignedInt", "u16") // at least 16 bits
+                    .replace("Int", "i16") // at least 16 bits
+                    .replace("UnsignedLongLong", "u64") // at least 64 bis
+                    .replace("LongLong", "i64") // at least 64 bis
+                    .replace("UnsignedLong", "u32") // at least 32 bits
+                    .replace("Long", "i32") // at least 32 bits
+                    .replace("Double", "f64") // usually 64 bits
+                    .replace("Float", "f32"); // usually 32 bits
+
+                out.push_str(&ret_typ);
             } else if let Some(ref ret) = cfunc.err {
+                let ret_typ = if ret.r#type.ends_with("_t") {
+                    ret.r#type[..ret.r#type.len() - 2]
+                        .replace(" ", "_")
+                        .to_camel_case()
+                } else {
+                    ret.r#type.replace(" ", "_").to_camel_case()
+                };
+
+                let ret_typ = ret_typ
+                    .replace("Textz", "std::ffi::CStr")
+                    .replace("Uint8", "u8")
+                    .replace("Int8", "i8")
+                    .replace("Uint16", "u8")
+                    .replace("Int16", "i16")
+                    .replace("Uint32", "u32")
+                    .replace("Int32", "i32")
+                    .replace("Uint64", "u64")
+                    .replace("Int64", "i64")
+                    .replace("Size", "usize")
+                    .replace("Ssize", "isize")
+                    // Requires cast.
+                    .replace("UnsignedChar", "u8") // at least 8 bits
+                    .replace("SignedChar", "i8") // at least 8 bits
+                    .replace("Char", "u8") // at least 8 bits
+                    .replace("UnsignedShort", "u16") // at least 16 bits
+                    .replace("Short", "i16") // at least 16 bits
+                    .replace("UnsignedInt", "u16") // at least 16 bits
+                    .replace("Int", "i16") // at least 16 bits
+                    .replace("UnsignedLongLong", "u64") // at least 64 bis
+                    .replace("LongLong", "i64") // at least 64 bis
+                    .replace("UnsignedLong", "u32") // at least 32 bits
+                    .replace("Long", "i32") // at least 32 bits
+                    .replace("Double", "f64") // usually 64 bits
+                    .replace("Float", "f32"); // usually 32 bits
+
                 out.push_str("Result<");
                 if let Some(new) = new {
                     out.push_str(&new);
@@ -441,7 +614,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     out.push_str("()");
                 }
                 out.push_str(",");
-                out.push_str(&ret.r#type);
+                out.push_str(&ret_typ);
                 out.push_str(">");
             } else {
                 if let Some(new) = new {
