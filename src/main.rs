@@ -206,7 +206,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     // Modifier on references - use NULL for None.
                     "Opt" => {},
                     // Modifier on references - multiple.
-                    "Arr" => {},
+                    a if a.starts_with("Arr") => {},
                     //
                     a => panic!("Invalid modifier: {}", a),
                 }
@@ -426,22 +426,36 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             let mut function_call = format!("((FUNC_{}).assume_init())(", global);
 
             for param in &cfunc.par {
+                let mut start = "";
                 let mut end = ", ";
+                let mut len = None;
+                let mut len_ret = false;
 
                 if param.attr.len() == 2 {
                     match param.attr.first().unwrap().as_str() {
                         // Modifier on references - use NULL for None.
                         "Opt" => {
-                            out.push_str("Option<");
+                            start = "Option<";
                             end = ">, ";
-                        },
+                        }
                         // Modifier on references - multiple.
-                        "Arr" => {
-                            out.push_str("&[");
+                        a if a.starts_with("Arr") => {
+                            start = "[";
                             end = "], ";
-                        },
+                            if a.len() > 4 {
+                                assert_eq!(a.chars().nth(3).unwrap(), ':');
+                                if a.contains("?") {
+                                    // FIXME: Add Par & not Ret with `?par`
+                                    len = Some(&a[4..a.len()-1]);
+                                    len_ret = true;
+                                } else {
+                                    len = Some(&a[4..]);
+                                    len_ret = false;
+                                }
+                            }
+                        }
                         //
-                        a => panic!("Invalid modifier: {}", a),
+                        a => panic!("Invalid modifier: {}", a)
                     }
                 }
 
@@ -483,8 +497,13 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 match param.attr.last().unwrap().as_str() {
                     // Input, pass-by-value (copy).
                     "Val" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
+                        out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
+                        function_call.push_str(&param.name);
+                        function_call.push_str(".into(), ");
                     },
                     // Output, pointer to uninitialized data to be initialized.
                     "Out" => new = Some(typ.clone()),
@@ -492,37 +511,60 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     "New" => new = Some(typ.clone()),
                     // Input-Output, initialized reference that may change.
                     "Mut" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
                         out.push_str("&mut ");
+                        out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
+                        // function_call.push_str(".into(), "); // FIXME
                     }
                     // Input, pass-by-reference, initialized memory that won't change.
                     "Ref" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
                         out.push_str("&");
+                        out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
+                        function_call.push_str("&");
+                        function_call.push_str(&param.name);
+                        // function_call.push_str(".into(), "); // FIXME
                     }
                     // Input, pass-by-reference, and free all.
                     "Old" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
                         out.push_str("&mut ");
+                        out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
+                        // function_call.push_str(".into(), "); // FIXME
                     },
                     // Input, pass-by-value (copy), and free all.
                     "Eat" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
+                        out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
+                        // function_call.push_str(".into(), "); // FIXME
                     }
                     // Input, pass-by-reference, and free fields but not struct itself.
                     "Inv" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
                         out.push_str("&");
+                        out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
+                        // function_call.push_str(".into(), "); // FIXME
                     }
                     // Input, pass-by-value (must use with Arr).
                     "Len" => {
                         function_call.push_str("DL_API_PLACEHOLDER_LEN.len()");
-                        out.push_str(end);
+                        // out.push_str(end);
+                        // function_call.push_str(".into(), "); // FIXME
                     }, // FIXME
                     // Output, pointer to uninitialized error data to be initialized.
                     "Err" => todo!(), // FIXME
@@ -533,7 +575,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 }
             }
 
-            out.push_str(") -> ");
+            out.push_str(")\n        -> ");
             if let Some(ref ret) = cfunc.ret {
                 let ret_typ = if ret.ends_with("_t") {
                     ret[..ret.len() - 2]
@@ -613,7 +655,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 } else {
                     out.push_str("()");
                 }
-                out.push_str(",");
+                out.push_str(", ");
                 out.push_str(&ret_typ);
                 out.push_str(">");
             } else {
@@ -623,7 +665,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     out.push_str("()");
                 }
             }
-            out.push_str(" {\n");
+            out.push_str("\n    {\n");
             out.push_str("        let _ret = unsafe { ");
             out.push_str(&function_call);
             out.push_str(") };\n        ");
