@@ -3,8 +3,9 @@
 #![allow(unsafe_code)]
 #![rustfmt::skip]
 
-use std::ffi::{c_void, c_char, c_int};
+use std::ffi::{c_void, c_char, c_int, c_long};
 use std::ptr::NonNull;
+use std::convert::TryInto;
 
 const LM_ID_NEWLM: c_long = -1;
 const RTLD_NOW: c_int = 0x00002;

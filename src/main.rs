@@ -37,6 +37,7 @@ struct Address {
     name: String,
     doc: Option<String>,
     r#struct: Option<String>,
+    bytes: Option<String>,
     old: Option<String>,
 }
 
@@ -148,16 +149,34 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         if let Some(ref record) = ad.r#struct {
             out.push_str(record);
         } else {
-            out.push_str("c_void");
+            out.push_str("[u8]");
         }
         out.push_str(");\n\n");
 
-        if let Some(ref old) = ad.old {
+        if let Some(ref len) = ad.bytes {
+            out.push_str("impl ");
+            out.push_str(&ad.name);
+            out.push_str(" {\n    unsafe fn uninit() -> Self {\n");
+            out.push_str("        Self(Vec::<u8>::with_capacity(");
+            out.push_str(len);
+            out.push_str(").into_boxed_slice().into_raw());\n");
+            out.push_str("    }\n}\n\n");
+        }
+
+        if ad.old.is_some() || ad.bytes.is_some() {
             out.push_str("impl Drop for ");
             out.push_str(&ad.name);
-            out.push_str(" {\n    fn drop(&mut self) {\n        ");
-            out.push_str(old);
-            out.push_str("(self.0);\n    }\n}\n\n");
+            out.push_str(" {\n    fn drop(&mut self) {\n");
+            if let Some(ref old) = ad.old {
+                out.push_str("        ");
+                out.push_str(old);
+                out.push_str("(self.0);\n");
+            }
+            if ad.bytes.is_some() {
+                out.push_str("        ");
+                out.push_str("let _ = unsafe { Box::<[u8]>::from_raw(self.0) }\n");
+            }
+            out.push_str("    }\n}\n\n");
         }
     }
 
@@ -245,6 +264,11 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 .replace("Float", "std::os::raw::c_float");
 
             match param.attr.last().unwrap().as_str() {
+                // Input, pass-by-address (copy reference)
+                "Adr" | "OutAdr" => {
+                    out.push_str("*mut [u8]");
+                    out.push_str(", ");
+                }
                 // Input, pass-by-value (copy).
                 "Val" => {
                     out.push_str(&typ);
@@ -424,6 +448,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
             let mut new = None;
             let mut function_call = format!("((FUNC_{}).assume_init())(", global);
+            let mut pre = "".to_string();
 
             for param in &cfunc.par {
                 let mut start = "";
@@ -495,6 +520,27 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     .replace("Float", "f32"); // usually 32 bits
 
                 match param.attr.last().unwrap().as_str() {
+                    // Output, pass-by-address to opaque structure.
+                    "OutAdr" => {
+                        pre.push_str("        let ");
+                        pre.push_str(&param.name);
+                        pre.push_str(" = ");
+                        pre.push_str(&typ);
+                        pre.push_str("::uninit();\n");
+                        function_call.push_str(&param.name);
+                        function_call.push_str(".0, ");
+                    }
+                    // Input, pass-by-address to opaque structure.
+                    "Adr" => {
+                        out.push_str(&param.name);
+                        out.push_str(": ");
+                        out.push_str("&");
+                        out.push_str(start);
+                        out.push_str(&typ);
+                        out.push_str(end);
+                        function_call.push_str(&param.name);
+                        function_call.push_str(".0, ");
+                    }
                     // Input, pass-by-value (copy).
                     "Val" => {
                         out.push_str(&param.name);
@@ -517,7 +563,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(start);
                         out.push_str(&typ);
                         out.push_str(end);
-                        // function_call.push_str(".into(), "); // FIXME
+                        function_call.push_str("&mut ");
+                        function_call.push_str(&param.name);
                     }
                     // Input, pass-by-reference, initialized memory that won't change.
                     "Ref" => {
@@ -529,7 +576,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(end);
                         function_call.push_str("&");
                         function_call.push_str(&param.name);
-                        // function_call.push_str(".into(), "); // FIXME
+                        function_call.push_str(".into(), ");
                     }
                     // Input, pass-by-reference, and free all.
                     "Old" => {
@@ -617,7 +664,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
                 out.push_str(&ret_typ);
 
-                return_statement = Some("_ret.into()\n".to_string());
+                return_statement = Some("_ret.try_into().unwrap()\n".to_string());
             } else if let Some(ref ret) = cfunc.err {
                 let ret_typ = if ret.r#type.ends_with("_t") {
                     ret.r#type[..ret.r#type.len() - 2]
@@ -665,20 +712,20 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 out.push_str(">");
 
                 return_statement = Some(format!(
-                    "match {}::from(_ret.into()) {{ {}=>Ok(()), e=>Err(e) }}\n",
-                    ret_typ,
+                    "match _ret.try_into().unwrap() {{ {}=>Ok(()), e=>Err(e) }}\n",
                     ret.success,
                 ));
             } else {
                 if let Some(new) = new {
                     out.push_str(&new);
-                    return_statement = Some("_ret\n".to_string());
+                    return_statement = Some("_ret.try_into().unwrap()\n".to_string());
                 } else {
                     out.push_str("()");
                     return_statement = None;
                 }
             }
             out.push_str("\n    {\n");
+            out.push_str(&pre);
             out.push_str("        let _ret = unsafe { ");
             out.push_str(&function_call);
             out.push_str(") };\n");

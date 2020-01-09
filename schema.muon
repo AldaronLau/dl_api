@@ -35,6 +35,8 @@ address: list record
   doc: optional text
   ## Associated struct - if left out, then struct is opaque
   struct: optional text
+  ## Function to get number of bytes to create.
+  bytes: optional text
   ## Associated desconstructor
   old: optional text
 ## Struct list
