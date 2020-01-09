@@ -576,6 +576,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             }
 
             out.push_str(")\n        -> ");
+
+            let return_statement;
+
             if let Some(ref ret) = cfunc.ret {
                 let ret_typ = if ret.ends_with("_t") {
                     ret[..ret.len() - 2]
@@ -613,6 +616,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     .replace("Float", "f32"); // usually 32 bits
 
                 out.push_str(&ret_typ);
+
+                return_statement = Some("_ret.into()\n".to_string());
             } else if let Some(ref ret) = cfunc.err {
                 let ret_typ = if ret.r#type.ends_with("_t") {
                     ret.r#type[..ret.r#type.len() - 2]
@@ -658,19 +663,30 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 out.push_str(", ");
                 out.push_str(&ret_typ);
                 out.push_str(">");
+
+                return_statement = Some(format!(
+                    "match {}::from(_ret.into()) {{ {}=>Ok(()), e=>Err(e) }}\n",
+                    ret_typ,
+                    ret.success,
+                ));
             } else {
                 if let Some(new) = new {
                     out.push_str(&new);
+                    return_statement = Some("_ret\n".to_string());
                 } else {
                     out.push_str("()");
+                    return_statement = None;
                 }
             }
             out.push_str("\n    {\n");
             out.push_str("        let _ret = unsafe { ");
             out.push_str(&function_call);
-            out.push_str(") };\n        ");
+            out.push_str(") };\n");
 
-            out.push_str("_ret\n");
+            if let Some(ref return_statement) = return_statement {
+                out.push_str("        ");
+                out.push_str(return_statement);
+            }
 
             out.push_str("    }\n\n");
         }

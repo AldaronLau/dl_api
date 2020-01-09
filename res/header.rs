@@ -30,7 +30,8 @@ unsafe fn sym(dll: &NonNull<c_void>, name: &[u8]) -> Option<NonNull<c_void>> {
 
 static mut THREAD_ID: std::mem::MaybeUninit<std::thread::ThreadID>
     = std::mem::MaybeUninit::uninit();
-static mut DLL: std::mem::MaybeUninit<NonNull<c_void>>;
+static mut DLL: std::mem::MaybeUninit<NonNull<c_void>>
+    = std::mem::MaybeUninit::uninit();
 static mut START_FFI: std::sync::Once = std::sync::Once::new();
 
 unsafe fn check_thread() -> Option<NonNull<c_void>> {
