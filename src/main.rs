@@ -410,12 +410,14 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         }
     }
 
-    out.push_str("\n");
-
     for module in mods {
-        out.push_str("/// A module contains functions.\npub struct ");
+        out.push_str("\n/// A module contains functions.\npub struct ");
         out.push_str(&module.name);
         out.push_str(";\n\n");
+
+        out.push_str("impl !Send + !Sync for ");
+        out.push_str(&module.name);
+        out.push_str(" {}\n\n");
 
         out.push_str("impl ");
         out.push_str(&module.name);
@@ -439,185 +441,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             }
             out.push_str("    fn ");
             out.push_str(&method);
-            out.push_str("(");
+            out.push_str("(&self, ");
 
             // let mut new = None;
             let mut function_call = format!("((FN_{}).assume_init())(", global);
             let mut pre = "".to_string();
 
             for param in &cfunc.proto.pars {
-                let mut start = "";
-                let mut end = ", ";
-                // let mut len = None;
-                let mut len_ret = false;
 
-                /*if param.attr.len() == 2 {
-                    match param.attr.first().unwrap().as_str() {
-                        // Modifier on references - use NULL for None.
-                        "Opt" => {
-                            start = "Option<";
-                            end = ">, ";
-                        }
-                        // Modifier on references - multiple.
-                        a if a.starts_with("Arr") => {
-                            start = "[";
-                            end = "], ";
-                            if a.len() > 4 {
-                                assert_eq!(a.chars().nth(3).unwrap(), ':');
-                                if a.contains("?") {
-                                    // FIXME: Add Par & not Ret with `?par`
-                                    len = Some(&a[4..a.len()-1]);
-                                    len_ret = true;
-                                } else {
-                                    len = Some(&a[4..]);
-                                    len_ret = false;
-                                }
-                            }
-                        }
-                        //
-                        a => panic!("Invalid modifier: {}", a)
-                    }
-                }*/
-
-                let typ = if param.0.ends_with("_t") {
-                    param.0[..param.0.len() - 2]
-                        .replace(" ", "_")
-                        .to_camel_case()
-                } else {
-                    param.0.replace(" ", "_").to_camel_case()
-                };
-
-                let typ = typ
-                    .replace("Textz", "std::ffi::CStr")
-                    .replace("Uint8", "u8")
-                    .replace("Int8", "i8")
-                    .replace("Uint16", "u8")
-                    .replace("Int16", "i16")
-                    .replace("Uint32", "u32")
-                    .replace("Int32", "i32")
-                    .replace("Uint64", "u64")
-                    .replace("Int64", "i64")
-                    .replace("Size", "usize")
-                    .replace("Ssize", "isize")
-                    // Requires cast.
-                    .replace("UnsignedChar", "u8") // at least 8 bits
-                    .replace("SignedChar", "i8") // at least 8 bits
-                    .replace("Char", "u8") // at least 8 bits
-                    .replace("UnsignedShort", "u16") // at least 16 bits
-                    .replace("Short", "i16") // at least 16 bits
-                    .replace("UnsignedInt", "u16") // at least 16 bits
-                    .replace("Int", "i16") // at least 16 bits
-                    .replace("UnsignedLongLong", "u64") // at least 64 bis
-                    .replace("LongLong", "i64") // at least 64 bis
-                    .replace("UnsignedLong", "u32") // at least 32 bits
-                    .replace("Long", "i32") // at least 32 bits
-                    .replace("Double", "f64") // usually 64 bits
-                    .replace("Float", "f32"); // usually 32 bits
-
-                /*match param.attr.last().unwrap().as_str() {
-                    // Output, pass-by-address to opaque structure.
-                    "OutAdr" => {
-                        pre.push_str("        let ");
-                        pre.push_str(&param.name);
-                        pre.push_str(" = ");
-                        pre.push_str(&typ);
-                        pre.push_str("::uninit();\n");
-                        function_call.push_str(&param.name);
-                        function_call.push_str(".0, ");
-                    }
-                    // Input, pass-by-address to opaque structure.
-                    "Adr" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str("&");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        function_call.push_str(&param.name);
-                        function_call.push_str(".0, ");
-                    }
-                    // Input, pass-by-value (copy).
-                    "Val" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        function_call.push_str(&param.name);
-                        function_call.push_str(".into(), ");
-                    },
-                    // Output, pointer to uninitialized data to be initialized.
-                    "Out" => new = Some(typ.clone()),
-                    // Output, pointer to uninitialized pointer to be allocated.
-                    "New" => new = Some(typ.clone()),
-                    // Input-Output, initialized reference that may change.
-                    "Mut" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str("&mut ");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        function_call.push_str("&mut ");
-                        function_call.push_str(&param.name);
-                    }
-                    // Input, pass-by-reference, initialized memory that won't change.
-                    "Ref" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str("&");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        function_call.push_str("&");
-                        function_call.push_str(&param.name);
-                        function_call.push_str(".into(), ");
-                    }
-                    // Input, pass-by-reference, and free all.
-                    "Old" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str("&mut ");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        // function_call.push_str(".into(), "); // FIXME
-                    },
-                    // Input, pass-by-value (copy), and free all.
-                    "Eat" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        // function_call.push_str(".into(), "); // FIXME
-                    }
-                    // Input, pass-by-reference, and free fields but not struct itself.
-                    "Inv" => {
-                        out.push_str(&param.name);
-                        out.push_str(": ");
-                        out.push_str("&");
-                        out.push_str(start);
-                        out.push_str(&typ);
-                        out.push_str(end);
-                        // function_call.push_str(".into(), "); // FIXME
-                    }
-                    // Input, pass-by-value (must use with Arr).
-                    "Len" => {
-                        function_call.push_str("DL_API_PLACEHOLDER_LEN.len()");
-                        // out.push_str(end);
-                        // function_call.push_str(".into(), "); // FIXME
-                    }, // FIXME
-                    // Output, pointer to uninitialized error data to be initialized.
-                    "Err" => todo!(), // FIXME
-                    // Use integer value as length for a .text parameter
-                    "Txt" => todo!(), // FIXME
-                    //
-                    a => panic!("Invalid modifier: {}", a),
-                }*/
             }
 
-            out.push_str(")\n        -> ");
+            out.push_str("\n    ) -> ");
 
             // let return_statement;
 
@@ -730,9 +564,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 // out.push_str(return_statement);
             //}
 
-            out.push_str("    }\n\n");
+            out.push_str("    }\n");
         }
-        out.push_str("}\n\n");
+        out.push_str("}\n");
     }
 
     out
