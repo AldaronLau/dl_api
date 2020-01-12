@@ -106,7 +106,7 @@ impl FromStr for Prototype {
         if string.chars().last() != Some(')') {
             return Err(());
         }
-        let split: Vec<&str> = string.split('(').collect();
+        let split: Vec<&str> = string[..(string.len()-1)].split('(').collect();
         if split.len() != 2 {
             return Err(());
         }
@@ -137,6 +137,37 @@ fn fail() -> String {
     eprintln!("    dl_api ffi/libname.muon src/ffi/libname.rs");
     eprintln!();
     std::process::exit(1);
+}
+
+fn c_type_as_binding(input: &str) -> String {
+    match input.trim_matches(|c: char| c.is_ascii_whitespace()) {
+        "uint8_t" => "u8".to_string(),
+        "int8_t" => "i8".to_string(),
+        "uint16_t" => "u8".to_string(),
+        "int16_t" => "i16".to_string(),
+        "uint32_t" => "u32".to_string(),
+        "int32_t" => "i32".to_string(),
+        "uint64_t" => "u64".to_string(),
+        "int64_t" => "i64".to_string(),
+        "char" => "std::os::raw::c_char".to_string(),
+        "unsigned char" => "std::os::raw::c_uchar".to_string(),
+        "signed char" => "std::os::raw::c_schar".to_string(),
+        "unsigned short" => "std::os::raw::c_ushort".to_string(),
+        "short" => "std::os::raw::c_short".to_string(),
+        "unsigned int" => "std::os::raw::c_uint".to_string(),
+        "int" => "std::os::raw::c_int".to_string(),
+        "unsigned long long int" => "std::os::raw::c_ulonglong".to_string(),
+        "long long int" => "std::os::raw::c_longlong".to_string(),
+        "unsigned long int" => "std::os::raw::c_ulong".to_string(),
+        "long int" => "std::os::raw::c_long".to_string(),
+        "double" => "std::os::raw::c_double".to_string(),
+        "float" => "std::os::raw::c_float".to_string(),
+        other => if other.ends_with("_t") {
+            other[..other.len() - 2].to_camel_case()
+        } else {
+            other.to_camel_case()
+        }
+    }
 }
 
 fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
@@ -188,14 +219,20 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
     // Addresses
     for ad in &spec.address {
+        let name = if ad.name.ends_with("_t") {
+            ad.name[..ad.name.len() - 2].to_camel_case()
+        } else {
+            ad.name.to_camel_case()
+        };
+
         if let Some(ref doc) = ad.doc {
             out.push_str("/// ");
             out.push_str(&doc.replace("\n", "\n/// "));
             out.push_str("\n");
         }
 
-        out.push_str("#[repr(C)]\npub struct ");
-        out.push_str(&ad.name);
+        out.push_str("pub struct ");
+        out.push_str(&name);
         out.push_str("(*mut ");
         if let Some(ref record) = ad.r#struct {
             out.push_str(record);
@@ -206,7 +243,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
         if let Some(ref len) = ad.bytes {
             out.push_str("impl ");
-            out.push_str(&ad.name);
+            out.push_str(&name);
             out.push_str(" {\n    unsafe fn uninit() -> Self {\n");
             out.push_str("        Self(Vec::<u8>::with_capacity(");
             out.push_str(len);
@@ -216,7 +253,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
         if ad.old.is_some() || ad.bytes.is_some() {
             out.push_str("impl Drop for ");
-            out.push_str(&ad.name);
+            out.push_str(&name);
             out.push_str(" {\n    fn drop(&mut self) {\n");
             if let Some(ref old) = ad.old {
                 out.push_str("        ");
@@ -268,194 +305,61 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             temp
         };
 
-        out.push_str("static mut FUNC_");
+        out.push_str("static mut FN_");
         out.push_str(&global);
-        out.push_str(": std::mem::MaybeUninit<extern fn(\n    ");
+        out.push_str(":\n    std::mem::MaybeUninit<extern fn(\n");
 
         for param in &proto.pars {
-/*            if param.attr.len() == 2 {
-                match param.attr.first().unwrap().as_str() {
-                    // Modifier on references - use NULL for None.
-                    "Opt" => {},
-                    // Modifier on references - multiple.
-                    a if a.starts_with("Arr") => {},
-                    //
-                    a => panic!("Invalid modifier: {}", a),
+            let (orig_type, is_const) = if param.0.starts_with("const ") {
+                (&param.0["const ".len()..], true)
+            } else {
+                (&param.0[..], false)
+            };
+            let trim_type = orig_type.trim_end_matches("*");
+
+            let num_ptr = orig_type.len() - trim_type.len();
+
+            let mut string = "".to_string();
+
+            let ctype = c_type_as_binding(trim_type);
+
+            out.push_str("        ");
+            out.push_str(&param.1);
+            out.push_str(": ");
+            for _ in 0..num_ptr {
+                if is_const {
+                    out.push_str("*const ");
+                } else {
+                    out.push_str("*mut ");
                 }
             }
-
-            let typ = if param.r#type.ends_with("_t") {
-                param.r#type[..param.r#type.len() - 2]
-                    .replace(" ", "_")
-                    .to_camel_case()
-            } else {
-                param.r#type.replace(" ", "_").to_camel_case()
-            };
-
-            let typ = typ
-                .replace("Textz", "std::os::raw::c_char")
-                .replace("Uint8", "u8")
-                .replace("Int8", "i8")
-                .replace("Uint16", "u8")
-                .replace("Int16", "i16")
-                .replace("Uint32", "u32")
-                .replace("Int32", "i32")
-                .replace("Uint64", "u64")
-                .replace("Int64", "i64")
-                .replace("UnsignedChar", "std::os::raw::c_uchar")
-                .replace("SignedChar", "std::os::raw::c_schar")
-                .replace("Char", "std::os::raw::c_char")
-                .replace("UnsignedShort", "std::os::raw::c_ushort")
-                .replace("Short", "std::os::raw::c_short")
-                .replace("UnsignedInt", "std::os::raw::c_uint")
-                .replace("Int", "std::os::raw::c_int")
-                .replace("UnsignedLongLong", "std::os::raw::c_ulonglong")
-                .replace("LongLong", "std::os::raw::c_longlong")
-                .replace("UnsignedLong", "std::os::raw::c_ulong")
-                .replace("Long", "std::os::raw::c_long")
-                .replace("Double", "std::os::raw::c_double")
-                .replace("Float", "std::os::raw::c_float");
-
-            match param.attr.last().unwrap().as_str() {
-                // Input, pass-by-address (copy reference)
-                "Adr" | "OutAdr" => {
-                    out.push_str("*mut [u8]");
-                    out.push_str(", ");
-                }
-                // Input, pass-by-value (copy).
-                "Val" => {
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                },
-                // Output, pointer to uninitialized data to be initialized.
-                "Out" => {
-                    out.push_str("*mut ");
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                },
-                // Output, pointer to uninitialized pointer to be allocated.
-                "New" => {
-                    out.push_str("*mut *mut ");
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                },
-                // Input-Output, initialized reference that may change.
-                "Mut" => {
-                    out.push_str("*mut ");
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                }
-                // Input, pass-by-reference, initialized memory that won't change.
-                "Ref" => {
-                    out.push_str("*const ");
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                }
-                // Input, pass-by-reference, and free all.
-                "Old" => {
-                    out.push_str("*mut ");
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                },
-                // Input, pass-by-value (copy), and free all.
-                "Eat" => {
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                },
-                // Input, pass-by-reference, and free fields but not struct itself.
-                "Inv" => {
-                    out.push_str("*const ");
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                }
-                // Input, pass-by-value (must use with Arr).
-                "Len" => {
-                    out.push_str(&typ);
-                    out.push_str(", ");
-                },
-                // Output, pointer to uninitialized error data to be initialized.
-                "Err" => todo!(), // FIXME
-                // Use integer value as length for a .text parameter
-                "Txt" => todo!(), // FIXME
-                //
-                a => panic!("Invalid modifier: {}", a),
-            }*/
+            out.push_str(ctype.as_str());
+            out.push_str(",\n");
         }
-        out.push_str("\n) -> ");
 
-        /*if let Some(ref ret) = func.ret {
-            let ret_typ = if ret.ends_with("_t") {
-                ret[..ret.len() - 2]
-                    .replace(" ", "_")
-                    .to_camel_case()
-            } else {
-                ret.replace(" ", "_").to_camel_case()
-            };
-
-            let ret_typ = ret_typ
-                .replace("Textz", "std::os::raw::c_char")
-                .replace("Uint8", "u8")
-                .replace("Int8", "i8")
-                .replace("Uint16", "u8")
-                .replace("Int16", "i16")
-                .replace("Uint32", "u32")
-                .replace("Int32", "i32")
-                .replace("Uint64", "u64")
-                .replace("Int64", "i64")
-                .replace("UnsignedChar", "std::os::raw::c_uchar")
-                .replace("SignedChar", "std::os::raw::c_schar")
-                .replace("Char", "std::os::raw::c_char")
-                .replace("UnsignedShort", "std::os::raw::c_ushort")
-                .replace("Short", "std::os::raw::c_short")
-                .replace("UnsignedInt", "std::os::raw::c_uint")
-                .replace("Int", "std::os::raw::c_int")
-                .replace("UnsignedLongLong", "std::os::raw::c_ulonglong")
-                .replace("LongLong", "std::os::raw::c_longlong")
-                .replace("UnsignedLong", "std::os::raw::c_ulong")
-                .replace("Long", "std::os::raw::c_long")
-                .replace("Double", "std::os::raw::c_double")
-                .replace("Float", "std::os::raw::c_float");
-
-            out.push_str(&ret_typ);
-        } else if let Some(ref ret) = func.err {
-            let ret_typ = if ret.r#type.ends_with("_t") {
-                ret.r#type[..ret.r#type.len() - 2]
-                    .replace(" ", "_")
-                    .to_camel_case()
-            } else {
-                ret.r#type.replace(" ", "_").to_camel_case()
-            };
-
-            let ret_typ = ret_typ
-                .replace("Textz", "std::os::raw::c_char")
-                .replace("Uint8", "u8")
-                .replace("Int8", "i8")
-                .replace("Uint16", "u8")
-                .replace("Int16", "i16")
-                .replace("Uint32", "u32")
-                .replace("Int32", "i32")
-                .replace("Uint64", "u64")
-                .replace("Int64", "i64")
-                .replace("UnsignedChar", "std::os::raw::c_uchar")
-                .replace("SignedChar", "std::os::raw::c_schar")
-                .replace("Char", "std::os::raw::c_char")
-                .replace("UnsignedShort", "std::os::raw::c_ushort")
-                .replace("Short", "std::os::raw::c_short")
-                .replace("UnsignedInt", "std::os::raw::c_uint")
-                .replace("Int", "std::os::raw::c_int")
-                .replace("UnsignedLongLong", "std::os::raw::c_ulonglong")
-                .replace("LongLong", "std::os::raw::c_longlong")
-                .replace("UnsignedLong", "std::os::raw::c_ulong")
-                .replace("Long", "std::os::raw::c_long")
-                .replace("Double", "std::os::raw::c_double")
-                .replace("Float", "std::os::raw::c_float");
-
-            out.push_str(&ret_typ);
+        let (orig_type, is_const) = if proto.ret.starts_with("const ") {
+            (&proto.ret["const ".len()..], true)
         } else {
-            out.push_str("()");
-        }*/
+            (&proto.ret[..], false)
+        };
+        let trim_type = orig_type.trim_end_matches("*");
 
-        out.push_str("> = std::mem::MaybeUninit::uninit();\n\n");
+        let num_ptr = orig_type.len() - trim_type.len();
+
+        let mut string = "".to_string();
+
+        let ctype = c_type_as_binding(trim_type);
+
+        out.push_str("    ) -> ");
+        for _ in 0..num_ptr {
+            if is_const {
+                out.push_str("*const ");
+            } else {
+                out.push_str("*mut ");
+            }
+        }
+        out.push_str(&ctype);
+        out.push_str("> = std::mem::MaybeUninit::uninit();\n");
 
         for module in &func.r#mod {
             if let Ok(index) = mods.binary_search(&Module { name: module.clone(), c_fn: vec![]}) {
@@ -475,6 +379,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             }
         }
     }
+
+    out.push_str("\n");
 
     for module in mods {
         out.push_str("/// A module contains functions.\npub struct ");
@@ -506,7 +412,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str("(");
 
             // let mut new = None;
-            let mut function_call = format!("((FUNC_{}).assume_init())(", global);
+            let mut function_call = format!("((FN_{}).assume_init())(", global);
             let mut pre = "".to_string();
 
             for param in &cfunc.proto.pars {
