@@ -110,21 +110,35 @@ impl FromStr for Prototype {
         if split.len() != 2 {
             return Err(());
         }
-        let func: Vec<&str> = split[0].split_ascii_whitespace().collect();
+        let mut func: Vec<&str> = split[0].split_ascii_whitespace().collect();
         if func.len() < 2 {
             return Err(());
         }
-        let ret = func[0].to_string();
-        let name = func[1].to_string();
+        let name = func.pop().unwrap().to_string();
+        let ctype = func.pop().unwrap();
+        let mut ret = String::new();
+        for modifier in func {
+            ret.push_str(modifier);
+            ret.push_str(" ");
+        }
+        ret.push_str(ctype);
+
         let mut pars = Vec::new();
 
         for par in split[1].split(',') {
-            let par: Vec<&str> = par.trim().split_ascii_whitespace().collect();
+            let mut par: Vec<&str> = par.trim().split_ascii_whitespace().collect();
             if par.len() < 2 {
                 return Err(());
             }
-            let ty = par[0].to_string();
-            let name = par[1].to_string();
+            let name = par.pop().unwrap().to_string();
+            let ctype = par.pop().unwrap();
+            let mut ty = String::new();
+            for modifier in par {
+                ty.push_str(modifier);
+                ty.push_str(" ");
+            }
+            ty.push_str(ctype);
+
             pars.push((ty, name));
         }
 
@@ -152,16 +166,17 @@ fn c_type_as_binding(input: &str) -> String {
         "char" => "std::os::raw::c_char".to_string(),
         "unsigned char" => "std::os::raw::c_uchar".to_string(),
         "signed char" => "std::os::raw::c_schar".to_string(),
-        "unsigned short" => "std::os::raw::c_ushort".to_string(),
-        "short" => "std::os::raw::c_short".to_string(),
-        "unsigned int" => "std::os::raw::c_uint".to_string(),
-        "int" => "std::os::raw::c_int".to_string(),
-        "unsigned long long int" => "std::os::raw::c_ulonglong".to_string(),
-        "long long int" => "std::os::raw::c_longlong".to_string(),
-        "unsigned long int" => "std::os::raw::c_ulong".to_string(),
+        "unsigned short" | "unsigned short int" => "std::os::raw::c_ushort".to_string(),
+        "short" | "signed short" | "short int" | "signed short int" => "std::os::raw::c_short".to_string(),
+        "unsigned int" | "unsigned" => "std::os::raw::c_uint".to_string(),
+        "int" | "signed int" | "signed" => "std::os::raw::c_int".to_string(),
+        "unsigned long long int" | "unsigned long long" => "std::os::raw::c_ulonglong".to_string(),
+        "long long int" | "long long" | "signed long long int" | "signed long long" => "std::os::raw::c_longlong".to_string(),
+        "unsigned long int" | "unsigned long" => "std::os::raw::c_ulong".to_string(),
         "long int" => "std::os::raw::c_long".to_string(),
         "double" => "std::os::raw::c_double".to_string(),
         "float" => "std::os::raw::c_float".to_string(),
+        // FIXME Long Double
         other => if other.ends_with("_t") {
             other[..other.len() - 2].to_camel_case()
         } else {
