@@ -92,11 +92,22 @@ struct Prototype {
     pars: Vec<(String, String)>,
 }
 
-/// C Function
+/// Safe C Function
 #[derive(Clone)]
 struct CFunc {
     proto: Prototype,
     doc: Option<String>,
+    pats: Vec<String>,
+}
+
+// Get the type of a formal C parameter.
+fn get_formal_type(params: &Vec<(String, String)>, name: &str) -> String {
+    for par in params {
+        if par.1 == name {
+            return par.0.clone();
+        }
+    }
+    panic!("parameter {} not found", name)
 }
 
 // Check if a struct is an address
@@ -164,11 +175,40 @@ fn fail() -> String {
     std::process::exit(1);
 }
 
+fn c_binding_into_rust(input: &str) -> Option<String> {
+    Some(match input {
+        "bool" => "bool".to_string(),
+        "u8" => "u8".to_string(),
+        "i8" => "i8".to_string(),
+        "u8" => "u8".to_string(),
+        "i16" => "i16".to_string(),
+        "u32" => "u32".to_string(),
+        "i32" => "i32".to_string(),
+        "u64" => "u64".to_string(),
+        "i64" => "i64".to_string(),
+        "std::os::raw::c_char" => "char".to_string(),
+        "std::os::raw::c_uchar" => "u8".to_string(),
+        "std::os::raw::c_schar" => "i8".to_string(),
+        "std::os::raw::c_ushort" => "u16".to_string(),
+        "std::os::raw::c_short" => "i16".to_string(),
+        "std::os::raw::c_uint" => "u32".to_string(),
+        "std::os::raw::c_int" => "i32".to_string(),
+        "std::os::raw::c_ulonglong" => "u64".to_string(),
+        "std::os::raw::c_longlong" => "i64".to_string(),
+        "std::os::raw::c_ulong" => "usize".to_string(),
+        "std::os::raw::c_long" => "isize".to_string(),
+        "std::os::raw::c_double" => "f64".to_string(),
+        "std::os::raw::c_float" => "f32".to_string(),
+        "[u8]" => return None,
+        other => other.to_string(),
+    })
+}
+
 fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
     match input.trim_matches(|c: char| c.is_ascii_whitespace()) {
         "uint8_t" => "u8".to_string(),
         "int8_t" => "i8".to_string(),
-        "uint16_t" => "u8".to_string(),
+        "uint16_t" => "u16".to_string(),
         "int16_t" => "i16".to_string(),
         "uint32_t" => "u32".to_string(),
         "int32_t" => "i32".to_string(),
@@ -187,6 +227,7 @@ fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
         "long int" => "std::os::raw::c_long".to_string(),
         "double" => "std::os::raw::c_double".to_string(),
         "float" => "std::os::raw::c_float".to_string(),
+        "bool" => "bool".to_string(),
         // FIXME Long Double
         other => if address_exists(addresses, other) {
             "[u8]".to_string()
@@ -396,6 +437,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 mods[index].c_fn.push(CFunc {
                     proto: proto.clone(),
                     doc: func.doc.clone(),
+                    pats: func.pat.clone(),
                 });
             } else {
                 mods.push(Module {
@@ -403,6 +445,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     c_fn: vec![CFunc {
                         proto: proto.clone(),
                         doc: func.doc.clone(),
+                        pats: func.pat.clone(),
                     }],
                 });
                 mods.sort_unstable();
@@ -441,17 +484,69 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             }
             out.push_str("    fn ");
             out.push_str(&method);
-            out.push_str("(&self, ");
+            out.push_str("(&self,\n");
 
             // let mut new = None;
-            let mut function_call = format!("((FN_{}).assume_init())(", global);
+            let mut function_call = format!("((FN_{}).assume_init())(\n", global);
             let mut pre = "".to_string();
+            let mut post = "".to_string();
 
-            for param in &cfunc.proto.pars {
+            for pattern in &cfunc.pats {
+                let mut iter = pattern.split(' ');
+                let rule = iter.next().unwrap();
 
+                match rule {
+                    "NEW" => { // Return, Pre uninit
+                    }
+                    "STR" => { // Parameter &CStr
+                        out.push_str("        ");
+                        out.push_str(iter.next().unwrap());
+                        out.push_str(": &std::ffi::CStr,\n");
+                    }
+                    "VAL" => { // Parameter (if object => ref)
+                        let name = iter.next().unwrap();
+                        let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let octype = octype.trim_end_matches("*");
+                        let ctype = c_type_as_binding(&octype, &spec.address);
+                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
+                        {
+                            (c, false)
+                        } else {
+                            (if octype.ends_with("_t") {
+                                octype[..octype.len() - 2].to_camel_case()
+                            } else {
+                                octype.to_camel_case()
+                            }, true)
+                        };
+
+                        out.push_str("        ");
+                        out.push_str(name);
+                        out.push_str(": ");
+                        if adr {
+                            out.push_str("&");
+                        }
+                        out.push_str(&ctype);
+                        out.push_str(",\n");
+                    }
+                    "OK" => { // Return, Post if -> result
+                    }
+                    "MUT" => { // Parameter, Pre cast, Post cast
+                    }
+                    "OPT_MUT" => { // Parameter, Pre cast, Post cast
+                    }
+                    "OLD" => { // Parameter object => move
+                    }
+                    "SLICE" => { // Parameter &[]
+                    }
+                    "OUT" => { // Return
+                    }
+                    "OUT_VEC" => { // Parameter Vec
+                    }
+                    unknown => panic!("Unknown pattern: {}", unknown),
+                }
             }
 
-            out.push_str("\n    ) -> ");
+            out.push_str("    ) -> ");
 
             // let return_statement;
 
@@ -554,10 +649,12 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 }
             }*/
             out.push_str("\n    {\n");
+            out.push_str("        unsafe {\n");
             out.push_str(&pre);
-            out.push_str("        let _ret = unsafe { ");
+            out.push_str("            let _ret = ");
             out.push_str(&function_call);
-            out.push_str(") };\n");
+            out.push_str("            );\n");
+            out.push_str("        }\n");
 
             //if let Some(ref return_statement) = return_statement {
             //    out.push_str("        ");
