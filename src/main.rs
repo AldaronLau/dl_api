@@ -99,6 +99,17 @@ struct CFunc {
     doc: Option<String>,
 }
 
+// Check if a struct is an address
+fn address_exists(addresses: &Vec<Address>, name: &str) -> bool {
+    for adr in addresses {
+        if adr.name == name {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl FromStr for Prototype {
     type Err = ();
 
@@ -153,7 +164,7 @@ fn fail() -> String {
     std::process::exit(1);
 }
 
-fn c_type_as_binding(input: &str) -> String {
+fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
     match input.trim_matches(|c: char| c.is_ascii_whitespace()) {
         "uint8_t" => "u8".to_string(),
         "int8_t" => "i8".to_string(),
@@ -177,10 +188,14 @@ fn c_type_as_binding(input: &str) -> String {
         "double" => "std::os::raw::c_double".to_string(),
         "float" => "std::os::raw::c_float".to_string(),
         // FIXME Long Double
-        other => if other.ends_with("_t") {
-            other[..other.len() - 2].to_camel_case()
+        other => if address_exists(addresses, other) {
+            "[u8]".to_string()
         } else {
-            other.to_camel_case()
+            if other.ends_with("_t") {
+                other[..other.len() - 2].to_camel_case()
+            } else {
+                other.to_camel_case()
+            }
         }
     }
 }
@@ -336,7 +351,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
             let mut string = "".to_string();
 
-            let ctype = c_type_as_binding(trim_type);
+            let ctype = c_type_as_binding(trim_type, &spec.address);
 
             out.push_str("        ");
             out.push_str(&param.1);
@@ -363,7 +378,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
         let mut string = "".to_string();
 
-        let ctype = c_type_as_binding(trim_type);
+        let ctype = c_type_as_binding(trim_type, &spec.address);
 
         out.push_str("    ) -> ");
         for _ in 0..num_ptr {
