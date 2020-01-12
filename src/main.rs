@@ -508,6 +508,11 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     "VAL" => { // Parameter (if object => ref)
                         let name = iter.next().unwrap();
                         let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let (octype, is_const) = if octype.starts_with("const ") {
+                            (&octype["const ".len()..], true)
+                        } else {
+                            (&octype[..], false)
+                        };
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
                         let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
