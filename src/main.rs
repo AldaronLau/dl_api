@@ -101,6 +101,16 @@ struct CFunc {
 }
 
 // Get the type of a formal C parameter.
+fn get_index(params: &Vec<(String, String)>, name: &str) -> usize {
+    for par in 0..params.len() {
+        if params[par].1 == name {
+            return par;
+        }
+    }
+    panic!("parameter {} not found", name)
+}
+
+// Get the type of a formal C parameter.
 fn get_formal_type(params: &Vec<(String, String)>, name: &str) -> String {
     for par in params {
         if par.1 == name {
@@ -482,16 +492,16 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 out.push_str(&doc.replace("\n", "\n    /// "));
                 out.push_str("\n");
             }
-            out.push_str("    fn ");
+            out.push_str("    pub fn ");
             out.push_str(&method);
             out.push_str("(&self,\n");
 
             // let mut new = None;
-            let mut function_call = format!("((FN_{}).assume_init())(\n", global);
             let mut pre = "".to_string();
             let mut post = "".to_string();
             let mut tuple = vec![];
             let mut result = false;
+            let mut function_params: Vec<String> = vec![];
 
             for pattern in &cfunc.pats {
                 let mut iter = pattern.split(' ');
@@ -499,6 +509,20 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
                 match rule {
                     "NEW" => { // Return, Pre uninit
+                        let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
+
+                        pre.push_str("            let mut ");
+                        pre.push_str(&name);
+                        pre.push_str(" = std::mem::MaybeUninit::uninit();\n");
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("{}.as_mut_ptr()", name);
+                        post.push_str("            let ");
+                        post.push_str(&name);
+                        post.push_str(" = ");
+                        post.push_str(&name);
+                        post.push_str(".assume_init();\n");
+                        tuple.push(name);
                     }
                     "STR" => { // Parameter &CStr
                         out.push_str("        ");
@@ -536,13 +560,19 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(",\n");
                     }
                     "OK" => { // Return, Post if -> result
-                        post.push_str("            let tuple = if _ret ");
+                        post.push_str("            if __ret ");
                         post.push_str(match iter.next().unwrap() {
-                            "=" => "==",
-                            a => a
+                            "=" => "!=",
+                            "<" => ">=",
+                            ">" => "<=",
+                            "<=" => ">",
+                            ">=" => "<",
+                            "!=" => "==",
+                            a => panic!("Unknown operator in OK {}!", a),
                         });
+                        post.push_str(" ");
                         post.push_str(iter.next().unwrap());
-                        post.push_str(" { Ok(tuple) } else { Err(_ret) };\n");
+                        post.push_str(" { return Err(__ret) };\n");
                         if result {
                             panic!("Can't use OK for results twice");
                         }
@@ -628,7 +658,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         if let Some(name) = iter.next() {
                             tuple.push(name);
                         } else {
-                            tuple.push("_ret");
+                            tuple.push("__ret");
                         }
                     }
                     "OUT_VEC" => { // Parameter Vec
@@ -661,8 +691,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             if length != 1 {
                 out.push_str("(");
             }
-            for name in tuple {
-                let octype = if name == "_ret" {
+            for name in tuple.iter() {
+                let octype = if name == &"__ret" {
                     cfunc.proto.ret.clone()
                 } else {
                     get_formal_type(&cfunc.proto.pars, name)
@@ -811,15 +841,61 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str("\n    {\n");
             out.push_str("        unsafe {\n");
             out.push_str(&pre);
-            out.push_str("            let _ret = ");
-            out.push_str(&function_call);
+            out.push_str("            let __ret = ");
+            out.push_str(&format!("((FN_{}).assume_init())(\n", global));
+            for param in function_params {
+                out.push_str("                ");
+                out.push_str(&param);
+                out.push_str(",\n");
+            }
             out.push_str("            );\n");
-            out.push_str("        }\n");
+            out.push_str(&post);
+            out.push_str("            ");
+            if result {
+                out.push_str("Ok(");
+            }
+            if length != 1 {
+                out.push_str("(");
+            }
+            for name in tuple.iter() {
+                let octype = if name == &"__ret" {
+                    cfunc.proto.ret.clone()
+                } else {
+                    get_formal_type(&cfunc.proto.pars, name)
+                };
 
-            //if let Some(ref return_statement) = return_statement {
-            //    out.push_str("        ");
-                // out.push_str(return_statement);
-            //}
+                let octype = octype.trim_end_matches("*");
+                let ctype = c_type_as_binding(&octype, &spec.address);
+                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
+                {
+                    (c, false)
+                } else {
+                    (if octype.ends_with("_t") {
+                        octype[..octype.len() - 2].to_camel_case()
+                    } else {
+                        octype.to_camel_case()
+                    }, true)
+                };
+                if adr {
+                    out.push_str(&ctype);
+                    out.push_str("(");                    
+                }
+                out.push_str(&name);
+                if adr {
+                    out.push_str(")");
+                }
+
+                if length != 1 {
+                    out.push_str(",")
+                }
+            }
+            if length != 1 {
+                out.push_str(")");
+            }
+            if result {
+                out.push_str(")");
+            }
+            out.push_str("\n        }\n");
 
             out.push_str("    }\n");
         }
