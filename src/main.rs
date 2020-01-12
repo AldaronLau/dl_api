@@ -490,6 +490,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             let mut function_call = format!("((FN_{}).assume_init())(\n", global);
             let mut pre = "".to_string();
             let mut post = "".to_string();
+            let mut tuple = vec![];
+            let mut result = false;
 
             for pattern in &cfunc.pats {
                 let mut iter = pattern.split(' ');
@@ -529,24 +531,177 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(",\n");
                     }
                     "OK" => { // Return, Post if -> result
+                        post.push_str("            let tuple = if _ret ");
+                        post.push_str(match iter.next().unwrap() {
+                            "=" => "==",
+                            a => a
+                        });
+                        post.push_str(iter.next().unwrap());
+                        post.push_str(" { Ok(tuple) } else { Err(_ret) };\n");
+                        if result {
+                            panic!("Can't use OK for results twice");
+                        }
+                        result = true;
                     }
                     "MUT" => { // Parameter, Pre cast, Post cast
+                        let name = iter.next().unwrap();
+                        let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let octype = octype.trim_end_matches("*");
+                        let ctype = c_type_as_binding(&octype, &spec.address);
+                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
+                        {
+                            (c, false)
+                        } else {
+                            panic!("Mutable reference to address not supported.  Use NEW");
+                        };
+
+                        out.push_str("        ");
+                        out.push_str(name);
+                        out.push_str(": &mut ");
+                        out.push_str(&ctype);
+                        out.push_str(",\n");
                     }
                     "OPT_MUT" => { // Parameter, Pre cast, Post cast
+                        let name = iter.next().unwrap();
+                        let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let octype = octype.trim_end_matches("*");
+                        let ctype = c_type_as_binding(&octype, &spec.address);
+                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
+                        {
+                            (c, false)
+                        } else {
+                            panic!("Mutable reference to address not supported.  Use NEW");
+                        };
+
+                        out.push_str("        ");
+                        out.push_str(name);
+                        out.push_str(": Option<&mut ");
+                        out.push_str(&ctype);
+                        out.push_str(">,\n");
                     }
                     "OLD" => { // Parameter object => move
+                        let name = iter.next().unwrap();
+                        let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let octype = octype.trim_end_matches("*");
+                        let ctype = c_type_as_binding(&octype, &spec.address);
+                        let ctype = if let Some(c) = c_binding_into_rust(&ctype)
+                        {
+                            c
+                        } else {
+                            if octype.ends_with("_t") {
+                                octype[..octype.len() - 2].to_camel_case()
+                            } else {
+                                octype.to_camel_case()
+                            }
+                        };
+
+                        out.push_str("        ");
+                        out.push_str(name);
+                        out.push_str(": ");
+                        out.push_str(&ctype);
+                        out.push_str(",\n");
                     }
                     "SLICE" => { // Parameter &[]
+                        let name = iter.next().unwrap();
+                        let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let octype = octype.trim_end_matches("*");
+                        let ctype = c_type_as_binding(&octype, &spec.address);
+                        let ctype = if let Some(c) = c_binding_into_rust(&ctype)
+                        {
+                            c
+                        } else {
+                            panic!("Vec of objects not supported");
+                        };
+
+                        out.push_str("        ");
+                        out.push_str(iter.next().unwrap());
+                        out.push_str(": &[");
+                        out.push_str(&ctype);
+                        out.push_str("],\n");
                     }
                     "OUT" => { // Return
+                        if let Some(name) = iter.next() {
+                            tuple.push(name);
+                        } else {
+                            tuple.push("_ret");
+                        }
                     }
                     "OUT_VEC" => { // Parameter Vec
+                        let name = iter.next().unwrap();
+                        let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let octype = octype.trim_end_matches("*");
+                        let ctype = c_type_as_binding(&octype, &spec.address);
+                        let ctype = if let Some(c) = c_binding_into_rust(&ctype)
+                        {
+                            c
+                        } else {
+                            panic!("Vec of objects not supported");
+                        };
+
+                        out.push_str("        ");
+                        out.push_str(iter.next().unwrap());
+                        out.push_str(": &mut Vec<");
+                        out.push_str(&ctype);
+                        out.push_str(">,\n");
                     }
                     unknown => panic!("Unknown pattern: {}", unknown),
                 }
             }
 
             out.push_str("    ) -> ");
+            if result {
+                out.push_str("Result<");
+            }
+            let length = tuple.len();
+            if length != 1 {
+                out.push_str("(");
+            }
+            for name in tuple {
+                let octype = if name == "_ret" {
+                    cfunc.proto.ret.clone()
+                } else {
+                    get_formal_type(&cfunc.proto.pars, name)
+                };
+
+                let octype = octype.trim_end_matches("*");
+                let ctype = c_type_as_binding(&octype, &spec.address);
+                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
+                {
+                    (c, false)
+                } else {
+                    (if octype.ends_with("_t") {
+                        octype[..octype.len() - 2].to_camel_case()
+                    } else {
+                        octype.to_camel_case()
+                    }, true)
+                };
+                out.push_str(&ctype);
+
+                if length != 1 {
+                    out.push_str(",")
+                }
+            }
+            if length != 1 {
+                out.push_str(")");
+            }
+            if result {
+                let octype = cfunc.proto.ret.trim_end_matches("*");
+                let ctype = c_type_as_binding(&octype, &spec.address);
+                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
+                {
+                    (c, false)
+                } else {
+                    (if octype.ends_with("_t") {
+                        octype[..octype.len() - 2].to_camel_case()
+                    } else {
+                        octype.to_camel_case()
+                    }, true)
+                };
+
+                out.push_str(", ");
+                out.push_str(&ctype); // TODO: From parameters
+                out.push_str(">");
+            }
 
             // let return_statement;
 
