@@ -3,6 +3,8 @@ use muon_rs as muon;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::Path;
+use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Serialize, Deserialize)]
 struct UnionVariant {
@@ -63,12 +65,10 @@ struct Err {
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Func {
-    sym: String,
+    def: String,
     r#mod: Vec<String>,
     doc: Option<String>,
-    ret: Option<String>,
-    err: Option<Err>,
-    par: Vec<Param>,
+    pat: Vec<String>,
 }
 
 /// The main struct for a safe FFI specification.
@@ -79,6 +79,57 @@ struct SafeFFI {
     address: Vec<Address>,
     r#struct: Vec<Struct>,
     func: Vec<Func>,
+}
+
+/// A C Prototype
+#[derive(Clone)]
+struct Prototype {
+    /// 
+    ret: String,
+    ///
+    name: String,
+    ///
+    pars: Vec<(String, String)>,
+}
+
+/// C Function
+#[derive(Clone)]
+struct CFunc {
+    proto: Prototype,
+    doc: Option<String>,
+}
+
+impl FromStr for Prototype {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Prototype, Self::Err> {
+        if string.chars().last() != Some(')') {
+            return Err(());
+        }
+        let split: Vec<&str> = string.split('(').collect();
+        if split.len() != 2 {
+            return Err(());
+        }
+        let func: Vec<&str> = split[0].split_ascii_whitespace().collect();
+        if func.len() < 2 {
+            return Err(());
+        }
+        let ret = func[0].to_string();
+        let name = func[1].to_string();
+        let mut pars = Vec::new();
+
+        for par in split[1].split(',') {
+            let par: Vec<&str> = par.trim().split_ascii_whitespace().collect();
+            if par.len() < 2 {
+                return Err(());
+            }
+            let ty = par[0].to_string();
+            let name = par[1].to_string();
+            pars.push((ty, name));
+        }
+
+        Ok(Prototype { ret, name, pars })
+    }
 }
 
 fn fail() -> String {
@@ -187,7 +238,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         // The name of the struct that represents the module.
         name: String,
         // Rust extern "C" functions' names, types and symbol.
-        c_fn: Vec<Func>,
+        c_fn: Vec<CFunc>,
     }
     impl std::cmp::PartialEq for Module {
         fn eq(&self, other: &Module) -> bool {
@@ -209,8 +260,10 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
     let mut mods: Vec<Module> = vec![]; // All modules.
 
     for func in &spec.func {
+        let proto = func.def.parse::<Prototype>().unwrap(); // FIXME unwrap
+
         let global = {
-            let mut temp = func.sym.clone();
+            let mut temp = proto.name.clone();
             temp.make_ascii_uppercase();
             temp
         };
@@ -219,8 +272,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str(&global);
         out.push_str(": std::mem::MaybeUninit<extern fn(\n    ");
 
-        for param in &func.par {
-            if param.attr.len() == 2 {
+        for param in &proto.pars {
+/*            if param.attr.len() == 2 {
                 match param.attr.first().unwrap().as_str() {
                     // Modifier on references - use NULL for None.
                     "Opt" => {},
@@ -326,11 +379,11 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 "Txt" => todo!(), // FIXME
                 //
                 a => panic!("Invalid modifier: {}", a),
-            }
+            }*/
         }
         out.push_str("\n) -> ");
 
-        if let Some(ref ret) = func.ret {
+        /*if let Some(ref ret) = func.ret {
             let ret_typ = if ret.ends_with("_t") {
                 ret[..ret.len() - 2]
                     .replace(" ", "_")
@@ -400,17 +453,23 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(&ret_typ);
         } else {
             out.push_str("()");
-        }
+        }*/
 
         out.push_str("> = std::mem::MaybeUninit::uninit();\n\n");
 
         for module in &func.r#mod {
             if let Ok(index) = mods.binary_search(&Module { name: module.clone(), c_fn: vec![]}) {
-                mods[index].c_fn.push(func.clone());
+                mods[index].c_fn.push(CFunc {
+                    proto: proto.clone(),
+                    doc: func.doc.clone(),
+                });
             } else {
                 mods.push(Module {
                     name: module.clone(),
-                    c_fn: vec![func.clone()],
+                    c_fn: vec![CFunc {
+                        proto: proto.clone(),
+                        doc: func.doc.clone(),
+                    }],
                 });
                 mods.sort_unstable();
             }
@@ -427,12 +486,12 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str(" {\n");
         for cfunc in &module.c_fn {
             let global = {
-                let mut temp = cfunc.sym.clone();
+                let mut temp = cfunc.proto.name.clone();
                 temp.make_ascii_uppercase();
                 temp
             };
             let method = {
-                let mut temp = cfunc.sym.clone();
+                let mut temp = cfunc.proto.name.clone();
                 temp.make_ascii_lowercase();
                 temp
             };
@@ -446,17 +505,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(&method);
             out.push_str("(");
 
-            let mut new = None;
+            // let mut new = None;
             let mut function_call = format!("((FUNC_{}).assume_init())(", global);
             let mut pre = "".to_string();
 
-            for param in &cfunc.par {
+            for param in &cfunc.proto.pars {
                 let mut start = "";
                 let mut end = ", ";
-                let mut len = None;
+                // let mut len = None;
                 let mut len_ret = false;
 
-                if param.attr.len() == 2 {
+                /*if param.attr.len() == 2 {
                     match param.attr.first().unwrap().as_str() {
                         // Modifier on references - use NULL for None.
                         "Opt" => {
@@ -482,14 +541,14 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         //
                         a => panic!("Invalid modifier: {}", a)
                     }
-                }
+                }*/
 
-                let typ = if param.r#type.ends_with("_t") {
-                    param.r#type[..param.r#type.len() - 2]
+                let typ = if param.0.ends_with("_t") {
+                    param.0[..param.0.len() - 2]
                         .replace(" ", "_")
                         .to_camel_case()
                 } else {
-                    param.r#type.replace(" ", "_").to_camel_case()
+                    param.0.replace(" ", "_").to_camel_case()
                 };
 
                 let typ = typ
@@ -519,7 +578,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     .replace("Double", "f64") // usually 64 bits
                     .replace("Float", "f32"); // usually 32 bits
 
-                match param.attr.last().unwrap().as_str() {
+                /*match param.attr.last().unwrap().as_str() {
                     // Output, pass-by-address to opaque structure.
                     "OutAdr" => {
                         pre.push_str("        let ");
@@ -619,14 +678,14 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     "Txt" => todo!(), // FIXME
                     //
                     a => panic!("Invalid modifier: {}", a),
-                }
+                }*/
             }
 
             out.push_str(")\n        -> ");
 
-            let return_statement;
+            // let return_statement;
 
-            if let Some(ref ret) = cfunc.ret {
+/*            if let Some(ref ret) = cfunc.proto.ret {
                 let ret_typ = if ret.ends_with("_t") {
                     ret[..ret.len() - 2]
                         .replace(" ", "_")
@@ -723,17 +782,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     out.push_str("()");
                     return_statement = None;
                 }
-            }
+            }*/
             out.push_str("\n    {\n");
             out.push_str(&pre);
             out.push_str("        let _ret = unsafe { ");
             out.push_str(&function_call);
             out.push_str(") };\n");
 
-            if let Some(ref return_statement) = return_statement {
-                out.push_str("        ");
-                out.push_str(return_statement);
-            }
+            //if let Some(ref return_statement) = return_statement {
+            //    out.push_str("        ");
+                // out.push_str(return_statement);
+            //}
 
             out.push_str("    }\n\n");
         }

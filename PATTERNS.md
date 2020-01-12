@@ -1,9 +1,8 @@
 # Patterns
 DL API builds safe Rust APIs to C code using common (and uncommon) C patterns.
 Patterns are denoted with attributes:
-- [OutAdr](Opaque Allocate Invalid / Initialize Later): Initialize pointer
-- [OutVec](Initialize At Least Part of an Uninitialized Buffer): Initialize buffer
-- [ReqLen](Initialize At Least Part of an Uninitialized Buffer): Buffer max length
+- [init_struct](Opaque Allocate Invalid / Initialize Later): Initialize pointer
+- [init_buffer](Initialize At Least Part of an Uninitialized Buffer): Initialize buffer
 
 ## Index of Patterns
 - [Opaque Allocate Invalid / Initialize Later](Opaque Allocate Invalid / Initialize Later)
@@ -39,14 +38,12 @@ Write SafeFFI MuON:
 ```muon
 address: Opaque
   bytes: size_of_opaque
-func: size_of_opaque
+func: size_t size_of_opaque(void)
   mod: Main
-  ret: size_t
-func: initialize
+func: void initialize(Opaque* opaque)
   mod: Main
-  par: opaque
-    attr: OutAdr
-    type: Opaque
+  pat:
+    init_struct: opaque
 ```
 
 Then write rust code:
@@ -81,15 +78,10 @@ int main(int argc, char* argv[]) {
 Write SafeFFI MuON:
 
 ```muon
-func: fill_buffer
+func: size_t fill_buffer(uint8_t* buffer, size_t length)
   mod: Main
-  len: size_t
-  par: buffer
-    attr: OutVec
-    type: uint8_t
-  par: length
-    attr: ReqLen
-    type: size_t
+  pat:
+    init_buffer: buffer length .return
 ```
 
 Then write rust code:

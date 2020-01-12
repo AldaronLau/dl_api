@@ -70,20 +70,15 @@ struct: list record
     type: text
 ## Function list.
 func: list record
-  ## Function symbol name.
-  sym: text
+  ## C Header definition of this function.
+  def: text
   ## C Module name.
   mod: list text
   ## Documentation of function from C API (optionally modify for Rust API).
   doc: optional text
-  ## Optional return value from return type of function (can't use with `err`).
-  ret: optional text
-  ## Optional error type from return type of function (can't use with `ret`).
-  err: optional record
-    ## Type
-    type: text
-    ## Success value
-    success: text
-  ## Parameter.
-  par: list record Param
+  ## C Patterns used in this function.
+  pat: dictionary
+    ## Pattern name is key, parameters affected is value (use .return keyword
+    ## for return value).
+    text: list text
 :::
