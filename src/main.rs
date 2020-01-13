@@ -322,7 +322,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         }
         out.push_str(");\n\n");
 
-        if let Some(ref len) = ad.bytes {
+        /*if let Some(ref len) = ad.bytes {
             out.push_str("impl ");
             out.push_str(&name);
             out.push_str(" {\n    unsafe fn uninit() -> Self {\n");
@@ -330,9 +330,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(len);
             out.push_str(").into_boxed_slice().into_raw());\n");
             out.push_str("    }\n}\n\n");
-        }
+        }*/
 
-        if ad.old.is_some() || ad.bytes.is_some() {
+        /*if ad.old.is_some() || ad.bytes.is_some() {
             out.push_str("impl Drop for ");
             out.push_str(&name);
             out.push_str(" {\n    fn drop(&mut self) {\n");
@@ -346,7 +346,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 out.push_str("let _ = unsafe { Box::<[u8]>::from_raw(self.0) }\n");
             }
             out.push_str("    }\n}\n\n");
-        }
+        }*/
     }
 
     // FIXME: Structs
@@ -466,15 +466,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
     for module in mods {
         out.push_str("\n/// A module contains functions.\npub struct ");
         out.push_str(&module.name);
-        out.push_str(";\n\n");
-
-        out.push_str("impl !Send for ");
-        out.push_str(&module.name);
-        out.push_str(" {}\n\n");
-
-        out.push_str("impl !Sync for ");
-        out.push_str(&module.name);
-        out.push_str(" {}\n\n");
+        out.push_str("(std::marker::PhantomData<*mut u8>);\n\n");
 
         out.push_str("impl ");
         out.push_str(&module.name);
