@@ -187,6 +187,7 @@ fn fail() -> String {
 
 fn c_binding_into_rust(input: &str) -> Option<String> {
     Some(match input {
+        "()" => "()".to_string(),
         "bool" => "bool".to_string(),
         "u8" => "u8".to_string(),
         "i8" => "i8".to_string(),
@@ -234,10 +235,11 @@ fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
         "unsigned long long int" | "unsigned long long" => "std::os::raw::c_ulonglong".to_string(),
         "long long int" | "long long" | "signed long long int" | "signed long long" => "std::os::raw::c_longlong".to_string(),
         "unsigned long int" | "unsigned long" => "std::os::raw::c_ulong".to_string(),
-        "long int" => "std::os::raw::c_long".to_string(),
+        "long int" | "long" => "std::os::raw::c_long".to_string(),
         "double" => "std::os::raw::c_double".to_string(),
         "float" => "std::os::raw::c_float".to_string(),
         "bool" => "bool".to_string(),
+        "void" => "()".to_string(),
         // FIXME Long Double
         other => if address_exists(addresses, other) {
             "[u8]".to_string()
@@ -272,7 +274,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(ty);
             out.push_str(")]\n");
         }
-        out.push_str("#[repr(C)]\n#[non_exhaustive]\npub(crate) enum ");
+        out.push_str("#[repr(C)]\n#[non_exhaustive]\n#[derive(Copy, Clone, Debug, PartialEq)]\npub enum ");
         if en.name.ends_with("_t") {
             out.push_str(&en.name[..en.name.len() - 2].to_camel_case());
         } else {
@@ -321,32 +323,6 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str("[u8]");
         }
         out.push_str(");\n\n");
-
-        /*if let Some(ref len) = ad.bytes {
-            out.push_str("impl ");
-            out.push_str(&name);
-            out.push_str(" {\n    unsafe fn uninit() -> Self {\n");
-            out.push_str("        Self(Vec::<u8>::with_capacity(");
-            out.push_str(len);
-            out.push_str(").into_boxed_slice().into_raw());\n");
-            out.push_str("    }\n}\n\n");
-        }*/
-
-        /*if ad.old.is_some() || ad.bytes.is_some() {
-            out.push_str("impl Drop for ");
-            out.push_str(&name);
-            out.push_str(" {\n    fn drop(&mut self) {\n");
-            if let Some(ref old) = ad.old {
-                out.push_str("        ");
-                out.push_str(old);
-                out.push_str("(self.0);\n");
-            }
-            if ad.bytes.is_some() {
-                out.push_str("        ");
-                out.push_str("let _ = unsafe { Box::<[u8]>::from_raw(self.0) }\n");
-            }
-            out.push_str("    }\n}\n\n");
-        }*/
     }
 
     // FIXME: Structs
@@ -579,7 +555,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         });
                         post.push_str(" ");
                         post.push_str(iter.next().unwrap());
-                        post.push_str(" { return Err(__ret) };\n");
+                        post.push_str(" { return Err(__ret as _) };\n");
                         if result {
                             panic!("Can't use OK for results twice");
                         }
@@ -589,6 +565,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
+                        if octype.starts_with("const ") {
+                            panic!("MUT Should not be const!!!");
+                        }
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
                         let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
@@ -620,6 +599,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
+                        if octype.starts_with("const ") {
+                            panic!("MUT Should not be const!!!");
+                        }
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
                         let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
@@ -638,10 +620,10 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         pre.push_str(&name);
                         pre.push_str(": _ = if let Some(_temp) = ");
                         pre.push_str(&name);
-                        pre.push_str("{ Some(*_temp as _) } else { None };\n");
+                        pre.push_str(".iter().next() { Some(**_temp as _) } else { None };\n");
                         post.push_str("            if let Some(_temp) = ");
                         post.push_str(&name);
-                        post.push_str("{ *_temp = __");
+                        post.push_str(" { *_temp = __");
                         post.push_str(&name);
                         post.push_str(".unwrap() as _; }\n");
                         function_params.resize(function_params.len().max(num + 1), String::new());
@@ -651,6 +633,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
+                        if octype.starts_with("const ") {
+                            panic!("MUT Should not be const!!!");
+                        }
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
                         let ctype = if let Some(c) = c_binding_into_rust(&ctype)
@@ -679,6 +664,11 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
+                        let (octype, is_const) = if octype.starts_with("const ") {
+                            (&octype["const ".len()..], true)
+                        } else {
+                            (&octype[..], false)
+                        };
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
                         let ctype = if let Some(c) = c_binding_into_rust(&ctype)
@@ -695,10 +685,10 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str("],\n");
 
                         function_params.resize(function_params.len().max(num + 1), String::new());
-                        function_params[num] = format!("{} as _", name);
+                        function_params[num] = format!("{}.as_ptr()", name);
 
                         function_params.resize(function_params.len().max(numlen + 1), String::new());
-                        function_params[numlen] = format!("{} as _", namelen);
+                        function_params[numlen] = format!("{}.len() as _", name);
                     }
                     "OUT" => { // Return
                         if let Some(name) = iter.next() {
@@ -756,7 +746,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}.as_mut_ptr()", name);
                         function_params.resize(function_params.len().max(numlen + 1), String::new());
-                        function_params[numlen] = format!("{}.capacity()", name);
+                        function_params[numlen] = format!("{}.capacity() as _", name);
                     }
                     unknown => panic!("Unknown pattern: {}", unknown),
                 }
