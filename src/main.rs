@@ -525,12 +525,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         tuple.push(name);
                     }
                     "STR" => { // Parameter &CStr
+                        let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         out.push_str("        ");
-                        out.push_str(iter.next().unwrap());
+                        out.push_str(name);
                         out.push_str(": &std::ffi::CStr,\n");
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("{}.as_ptr()", name);
                     }
                     "VAL" => { // Parameter (if object => ref)
                         let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let (octype, is_const) = if octype.starts_with("const ") {
                             (&octype["const ".len()..], true)
@@ -558,6 +563,12 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         }
                         out.push_str(&ctype);
                         out.push_str(",\n");
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        if adr {
+                            function_params[num] = format!("{}.0", name);
+                        } else {
+                            function_params[num] = format!("{} as _", name);
+                        }
                     }
                     "OK" => { // Return, Post if -> result
                         post.push_str("            if __ret ");
@@ -580,6 +591,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     }
                     "MUT" => { // Parameter, Pre cast, Post cast
                         let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
@@ -595,9 +607,22 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(": &mut ");
                         out.push_str(&ctype);
                         out.push_str(",\n");
+                        pre.push_str("            let mut __");
+                        pre.push_str(&name);
+                        pre.push_str(": _ = ");
+                        pre.push_str(&name);
+                        pre.push_str(" as _;\n");
+                        post.push_str("            *");
+                        post.push_str(&name);
+                        post.push_str(" = __");
+                        post.push_str(&name);
+                        post.push_str(" as _;\n");
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("&mut {}", name);
                     }
                     "OPT_MUT" => { // Parameter, Pre cast, Post cast
                         let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
@@ -613,15 +638,28 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(": Option<&mut ");
                         out.push_str(&ctype);
                         out.push_str(">,\n");
+                        pre.push_str("            let mut __");
+                        pre.push_str(&name);
+                        pre.push_str(": _ = if let Some(_temp) = ");
+                        pre.push_str(&name);
+                        pre.push_str("{ Some(_temp as _) } else { None };\n");
+                        post.push_str("            if let Some(_temp) = ");
+                        post.push_str(&name);
+                        post.push_str("{ *_temp = __");
+                        post.push_str(&name);
+                        post.push_str(".unwrap() as _; }\n");
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("&mut {}", name);
                     }
                     "OLD" => { // Parameter object => move
                         let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
                         let ctype = if let Some(c) = c_binding_into_rust(&ctype)
                         {
-                            c
+                            panic!("Can't destroy non-object {}!", c);
                         } else {
                             if octype.ends_with("_t") {
                                 octype[..octype.len() - 2].to_camel_case()
@@ -635,9 +673,15 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         out.push_str(": ");
                         out.push_str(&ctype);
                         out.push_str(",\n");
+
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("{}.0", name);
                     }
                     "SLICE" => { // Parameter &[]
+                        let namelen = iter.next().unwrap();
+                        let numlen = get_index(&cfunc.proto.pars, namelen);
                         let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
@@ -649,10 +693,16 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         };
 
                         out.push_str("        ");
-                        out.push_str(iter.next().unwrap());
+                        out.push_str(name);
                         out.push_str(": &[");
                         out.push_str(&ctype);
                         out.push_str("],\n");
+
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("{} as _", name);
+
+                        function_params.resize(function_params.len().max(numlen + 1), String::new());
+                        function_params[numlen] = format!("{} as _", namelen);
                     }
                     "OUT" => { // Return
                         if let Some(name) = iter.next() {
@@ -662,7 +712,10 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         }
                     }
                     "OUT_VEC" => { // Parameter Vec
+                        let namelen = iter.next().unwrap();
+                        let numlen = get_index(&cfunc.proto.pars, namelen);
                         let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
@@ -674,10 +727,25 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         };
 
                         out.push_str("        ");
-                        out.push_str(iter.next().unwrap());
+                        out.push_str(name);
                         out.push_str(": &mut Vec<");
                         out.push_str(&ctype);
                         out.push_str(">,\n");
+
+                        post.push_str("            ");
+                        post.push_str(name);
+                        post.push_str(".set_len(");
+                        if let Some(par) = iter.next() {
+                            todo!(); // FIXME: Add out parameter support
+                        } else {
+                            post.push_str("__ret");
+                        }
+                        post.push_str(" as _);\n");
+
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("{}.as_mut_ptr()", name);
+                        function_params.resize(function_params.len().max(numlen + 1), String::new());
+                        function_params[numlen] = format!("{}.capacity()", name);
                     }
                     unknown => panic!("Unknown pattern: {}", unknown),
                 }
