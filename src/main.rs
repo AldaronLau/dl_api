@@ -447,6 +447,25 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str("impl ");
         out.push_str(&module.name);
         out.push_str(" {\n");
+        out.push_str("    /// Load a module.\n");
+        out.push_str("    pub fn new() -> Option<Self> {\n");
+        out.push_str("        unsafe {\n");
+        out.push_str("            let dll = check_thread()?;\n");
+        for cfunc in &module.c_fn {
+            let global = {
+                let mut temp = cfunc.proto.name.clone();
+                temp.make_ascii_uppercase();
+                temp
+            };
+            out.push_str("            FN_");
+            out.push_str(&global);
+            out.push_str(" = std::mem::MaybeUninit::new(std::mem::transmute(sym(&dll, b\"");
+            out.push_str(&cfunc.proto.name);
+            out.push_str("\\0\")?.as_ptr()));\n");
+        }
+        out.push_str("            Some(Self(std::marker::PhantomData))\n");
+        out.push_str("        }\n");
+        out.push_str("    }\n");
         for cfunc in &module.c_fn {
             let global = {
                 let mut temp = cfunc.proto.name.clone();

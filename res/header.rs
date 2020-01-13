@@ -13,17 +13,12 @@ extern {
         filename: *const std::os::raw::c_char,
         flags: std::os::raw::c_int
     ) -> *mut std::ffi::c_void;
-    fn dlclose(handle: *mut std::ffi::c_void) -> std::os::raw::c_int;
     fn dlsym(handle: *mut std::ffi::c_void, symbol: *const std::os::raw::c_char)
         -> *mut std::ffi::c_void;
 }
 
 unsafe fn new(name: &[u8]) -> Option<std::ptr::NonNull<std::ffi::c_void>> {
     std::ptr::NonNull::new(dlmopen(LM_ID_NEWLM, name.as_ptr().cast(), RTLD_NOW))
-}
-
-unsafe fn old(dll: std::ptr::NonNull<std::ffi::c_void>) {
-    assert_eq!(dlclose(dll.as_ptr()), 0);
 }
 
 unsafe fn sym(dll: &std::ptr::NonNull<std::ffi::c_void>, name: &[u8])
