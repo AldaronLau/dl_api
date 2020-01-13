@@ -468,7 +468,11 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str(&module.name);
         out.push_str(";\n\n");
 
-        out.push_str("impl !Send + !Sync for ");
+        out.push_str("impl !Send for ");
+        out.push_str(&module.name);
+        out.push_str(" {}\n\n");
+
+        out.push_str("impl !Sync for ");
         out.push_str(&module.name);
         out.push_str(" {}\n\n");
 
@@ -706,6 +710,21 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     }
                     "OUT" => { // Return
                         if let Some(name) = iter.next() {
+                            let num = get_index(&cfunc.proto.pars, name);
+
+                            pre.push_str("            let mut ");
+                            pre.push_str(&name);
+                            pre.push_str(" = std::mem::MaybeUninit::uninit();\n");
+
+                            function_params.resize(function_params.len().max(num + 1), String::new());
+                            function_params[num] = format!("{}.as_mut_ptr()", name);
+
+                            post.push_str("            let ");
+                            post.push_str(&name);
+                            post.push_str(" = ");
+                            post.push_str(&name);
+                            post.push_str(".assume_init();\n");
+
                             tuple.push(name);
                         } else {
                             tuple.push("__ret");
@@ -952,6 +971,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 if adr {
                     out.push_str(")");
                 }
+                out.push_str(" as _");
 
                 if length != 1 {
                     out.push_str(",")
