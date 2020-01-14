@@ -210,7 +210,7 @@ fn c_binding_into_rust(input: &str) -> Option<String> {
         "std::os::raw::c_long" => "isize".to_string(),
         "std::os::raw::c_double" => "f64".to_string(),
         "std::os::raw::c_float" => "f32".to_string(),
-        "[u8]" => return None,
+        "std::os::raw::c_void" => return None,
         other => other.to_string(),
     })
 }
@@ -242,7 +242,7 @@ fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
         "void" => "()".to_string(),
         // FIXME Long Double
         other => if address_exists(addresses, other) {
-            "[u8]".to_string()
+            "std::os::raw::c_void".to_string()
         } else {
             if other.ends_with("_t") {
                 other[..other.len() - 2].to_camel_case()
@@ -320,7 +320,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         if let Some(ref record) = ad.r#struct {
             out.push_str(record);
         } else {
-            out.push_str("[u8]");
+            out.push_str("std::os::raw::c_void");
         }
         out.push_str(");\n\n");
     }
@@ -670,12 +670,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
                         out.push_str("        ");
                         out.push_str(name);
-                        out.push_str(": ");
+                        out.push_str(": &mut ");
                         out.push_str(&ctype);
                         out.push_str(",\n");
-
+                        pre.push_str("            if ");
+                        pre.push_str(name);
+                        pre.push_str(".0.is_null() { panic!(\"Object free'd twice!\") }\n");
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}.0", name);
+                        post.push_str("            ");
+                        post.push_str(name);
+                        post.push_str(".0 = std::ptr::null_mut();\n");
                     }
                     "SLICE" => { // Parameter &[]
                         let namelen = iter.next().unwrap();

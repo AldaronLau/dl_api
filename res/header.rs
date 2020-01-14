@@ -35,16 +35,15 @@ static mut START_FFI: std::sync::Once = std::sync::Once::new();
 static mut SUCCESS: bool = false;
 
 unsafe fn check_thread() -> Option<std::ptr::NonNull<std::ffi::c_void>> {
-    assert_eq!(THREAD_ID.assume_init(), std::thread::current().id());
-
     START_FFI.call_once(|| {
         THREAD_ID = std::mem::MaybeUninit::new(std::thread::current().id());
         if let Some(dll) = new(DL_API_SHARED_OBJECT_NAME) {
             DLL = std::mem::MaybeUninit::new(dll);
-        } else {
             SUCCESS = true;
         }
     });
+
+    assert_eq!(THREAD_ID.assume_init(), std::thread::current().id());
 
     if SUCCESS {
         Some(DLL.assume_init())
