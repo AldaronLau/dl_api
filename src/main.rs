@@ -330,7 +330,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         } else {
             out.push_str("std::os::raw::c_void");
         }
-        out.push_str(");\n\n");
+        out.push_str(");\n\nimpl ");
+        out.push_str(&name);
+        out.push_str(" {\n    /// Create address struct from raw pointer.\n    pub unsafe fn from_raw(raw: *mut std::os::raw::c_void) -> Self {\n        Self(raw)\n    }\n}\n\n");
     }
 
     // FIXME: Structs
