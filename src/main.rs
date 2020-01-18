@@ -1,9 +1,9 @@
 use heck::{CamelCase, ShoutySnakeCase};
 use muon_rs as muon;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
-use std::collections::HashMap;
 use std::str::FromStr;
 
 #[derive(Serialize, Deserialize)]
@@ -84,7 +84,7 @@ struct SafeFFI {
 /// A C Prototype
 #[derive(Clone)]
 struct Prototype {
-    /// 
+    ///
     ret: String,
     ///
     name: String,
@@ -138,7 +138,7 @@ impl FromStr for Prototype {
         if string.chars().last() != Some(')') {
             return Err(());
         }
-        let split: Vec<&str> = string[..(string.len()-1)].split('(').collect();
+        let split: Vec<&str> = string[..(string.len() - 1)].split('(').collect();
         if split.len() != 2 {
             return Err(());
         }
@@ -229,11 +229,15 @@ fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
         "unsigned char" => "std::os::raw::c_uchar".to_string(),
         "signed char" => "std::os::raw::c_schar".to_string(),
         "unsigned short" | "unsigned short int" => "std::os::raw::c_ushort".to_string(),
-        "short" | "signed short" | "short int" | "signed short int" => "std::os::raw::c_short".to_string(),
+        "short" | "signed short" | "short int" | "signed short int" => {
+            "std::os::raw::c_short".to_string()
+        }
         "unsigned int" | "unsigned" => "std::os::raw::c_uint".to_string(),
         "int" | "signed int" | "signed" => "std::os::raw::c_int".to_string(),
         "unsigned long long int" | "unsigned long long" => "std::os::raw::c_ulonglong".to_string(),
-        "long long int" | "long long" | "signed long long int" | "signed long long" => "std::os::raw::c_longlong".to_string(),
+        "long long int" | "long long" | "signed long long int" | "signed long long" => {
+            "std::os::raw::c_longlong".to_string()
+        }
         "unsigned long int" | "unsigned long" => "std::os::raw::c_ulong".to_string(),
         "long int" | "long" => "std::os::raw::c_long".to_string(),
         "double" => "std::os::raw::c_double".to_string(),
@@ -241,13 +245,15 @@ fn c_type_as_binding(input: &str, addresses: &Vec<Address>) -> String {
         "bool" => "bool".to_string(),
         "void" => "()".to_string(),
         // FIXME Long Double
-        other => if address_exists(addresses, other) {
-            "std::os::raw::c_void".to_string()
-        } else {
-            if other.ends_with("_t") {
-                other[..other.len() - 2].to_camel_case()
+        other => {
+            if address_exists(addresses, other) {
+                "std::os::raw::c_void".to_string()
             } else {
-                other.to_camel_case()
+                if other.ends_with("_t") {
+                    other[..other.len() - 2].to_camel_case()
+                } else {
+                    other.to_camel_case()
+                }
             }
         }
     }
@@ -274,7 +280,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(ty);
             out.push_str(")]\n");
         }
-        out.push_str("#[repr(C)]\n#[non_exhaustive]\n#[derive(Copy, Clone, Debug, PartialEq)]\npub enum ");
+        out.push_str(
+            "#[repr(C)]\n#[non_exhaustive]\n#[derive(Copy, Clone, Debug, PartialEq)]\npub enum ",
+        );
         if en.name.ends_with("_t") {
             out.push_str(&en.name[..en.name.len() - 2].to_camel_case());
         } else {
@@ -390,7 +398,11 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     out.push_str("*mut ");
                 }
             }
-            out.push_str(ctype.as_str());
+            if ctype == "()" {
+                out.push_str("std::ffi::c_void");
+            } else {
+                out.push_str(ctype.as_str());
+            }
             out.push_str(",\n");
         }
 
@@ -419,7 +431,10 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str("> = std::mem::MaybeUninit::uninit();\n");
 
         for module in &func.r#mod {
-            if let Ok(index) = mods.binary_search(&Module { name: module.clone(), c_fn: vec![]}) {
+            if let Ok(index) = mods.binary_search(&Module {
+                name: module.clone(),
+                c_fn: vec![],
+            }) {
                 mods[index].c_fn.push(CFunc {
                     proto: proto.clone(),
                     doc: func.doc.clone(),
@@ -454,7 +469,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         out.push_str("impl ");
         out.push_str(&module.name);
         out.push_str(" {\n");
-        out.push_str("    /// Get a handle to this module.  Loads module functions on first call.\n");
+        out.push_str(
+            "    /// Get a handle to this module.  Loads module functions on first call.\n",
+        );
         out.push_str("    pub fn new() -> Option<Self> {\n");
         out.push_str("        unsafe {\n");
         out.push_str("            let dll = check_thread()?;\n");
@@ -515,7 +532,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 let rule = iter.next().unwrap();
 
                 match rule {
-                    "NEW" => { // Return, Pre uninit
+                    "NEW" => {
+                        // Return, Pre uninit
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
 
@@ -531,7 +549,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         post.push_str(".assume_init();\n");
                         tuple.push(name);
                     }
-                    "STR" => { // Parameter &CStr
+                    "STR" => {
+                        // Parameter &CStr
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         out.push_str("        ");
@@ -540,7 +559,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}.as_ptr()", name);
                     }
-                    "RAW" => { // Parameter (if object => ref)
+                    "RAW" => {
+                        // Parameter (if object => ref)
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
 
@@ -550,7 +570,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}", name);
                     }
-                    "VAL" => { // Parameter (if object => ref)
+                    "VAL" => {
+                        // Parameter (if object => ref)
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
@@ -561,15 +582,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         };
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
-                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
-                        {
+                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype) {
                             (c, false)
                         } else {
-                            (if octype.ends_with("_t") {
-                                octype[..octype.len() - 2].to_camel_case()
-                            } else {
-                                octype.to_camel_case()
-                            }, true)
+                            (
+                                if octype.ends_with("_t") {
+                                    octype[..octype.len() - 2].to_camel_case()
+                                } else {
+                                    octype.to_camel_case()
+                                },
+                                true,
+                            )
                         };
 
                         out.push_str("        ");
@@ -587,7 +610,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                             function_params[num] = format!("{} as _", name);
                         }
                     }
-                    "OK" => { // Return, Post if -> result
+                    "OK" => {
+                        // Return, Post if -> result
                         post.push_str("            if __ret ");
                         post.push_str(match iter.next().unwrap() {
                             "=" => "!=",
@@ -606,7 +630,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         }
                         result = true;
                     }
-                    "MUT" => { // Parameter, Pre cast, Post cast
+                    "MUT" => {
+                        // Parameter, Pre cast, Post cast
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
@@ -615,8 +640,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         }
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
-                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
-                        {
+                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype) {
                             (c, false)
                         } else {
                             panic!("Mutable reference to address not supported.  Use NEW");
@@ -640,7 +664,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("&mut __{}", name);
                     }
-                    "OPT_MUT" => { // Parameter, Pre cast, Post cast
+                    "OPT_MUT" => {
+                        // Parameter, Pre cast, Post cast
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
@@ -649,8 +674,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         }
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
-                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
-                        {
+                        let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype) {
                             (c, false)
                         } else {
                             panic!("Mutable reference to address not supported.  Use NEW");
@@ -674,7 +698,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("if let Some(ref mut _temp) = __{} {{ _temp }} else {{ std::ptr::null_mut() }}", name);
                     }
-                    "OLD" => { // Parameter object => move
+                    "OLD" => {
+                        // Parameter object => move
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
                         let octype = get_formal_type(&cfunc.proto.pars, name);
@@ -683,8 +708,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         }
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
-                        let ctype = if let Some(c) = c_binding_into_rust(&ctype)
-                        {
+                        let ctype = if let Some(c) = c_binding_into_rust(&ctype) {
                             panic!("Can't destroy non-object {}!", c);
                         } else {
                             if octype.ends_with("_t") {
@@ -708,7 +732,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         post.push_str(name);
                         post.push_str(".0 = std::ptr::null_mut();\n");
                     }
-                    "SLICE" => { // Parameter &[]
+                    "SLICE" => {
+                        // Parameter &[]
                         let namelen = iter.next().unwrap();
                         let numlen = get_index(&cfunc.proto.pars, namelen);
                         let name = iter.next().unwrap();
@@ -721,8 +746,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         };
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
-                        let ctype = if let Some(c) = c_binding_into_rust(&ctype)
-                        {
+                        let ctype = if let Some(c) = c_binding_into_rust(&ctype) {
                             c
                         } else {
                             panic!("Vec of objects not supported");
@@ -737,10 +761,12 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}.as_ptr()", name);
 
-                        function_params.resize(function_params.len().max(numlen + 1), String::new());
+                        function_params
+                            .resize(function_params.len().max(numlen + 1), String::new());
                         function_params[numlen] = format!("{}.len() as _", name);
                     }
-                    "OUT" => { // Return
+                    "OUT" => {
+                        // Return
                         if let Some(name) = iter.next() {
                             let num = get_index(&cfunc.proto.pars, name);
 
@@ -748,7 +774,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                             pre.push_str(&name);
                             pre.push_str(" = std::mem::MaybeUninit::uninit();\n");
 
-                            function_params.resize(function_params.len().max(num + 1), String::new());
+                            function_params
+                                .resize(function_params.len().max(num + 1), String::new());
                             function_params[num] = format!("{}.as_mut_ptr()", name);
 
                             post.push_str("            let ");
@@ -762,7 +789,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                             tuple.push("__ret");
                         }
                     }
-                    "OUT_VEC" => { // Parameter Vec
+                    "OUT_VEC" => {
+                        // Parameter Vec
                         let namelen = iter.next().unwrap();
                         let numlen = get_index(&cfunc.proto.pars, namelen);
                         let name = iter.next().unwrap();
@@ -770,8 +798,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         let octype = get_formal_type(&cfunc.proto.pars, name);
                         let octype = octype.trim_end_matches("*");
                         let ctype = c_type_as_binding(&octype, &spec.address);
-                        let ctype = if let Some(c) = c_binding_into_rust(&ctype)
-                        {
+                        let ctype = if let Some(c) = c_binding_into_rust(&ctype) {
                             c
                         } else {
                             panic!("Vec of objects not supported");
@@ -795,7 +822,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}.as_mut_ptr()", name);
-                        function_params.resize(function_params.len().max(numlen + 1), String::new());
+                        function_params
+                            .resize(function_params.len().max(numlen + 1), String::new());
                         function_params[numlen] = format!("{}.capacity() as _", name);
                     }
                     unknown => panic!("Unknown pattern: {}", unknown),
@@ -827,15 +855,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                 }
                 let octype = octype.trim_end_matches("*");
                 let ctype = c_type_as_binding(&octype, &spec.address);
-                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
-                {
+                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype) {
                     (c, false)
                 } else {
-                    (if octype.ends_with("_t") {
-                        octype[..octype.len() - 2].to_camel_case()
-                    } else {
-                        octype.to_camel_case()
-                    }, true)
+                    (
+                        if octype.ends_with("_t") {
+                            octype[..octype.len() - 2].to_camel_case()
+                        } else {
+                            octype.to_camel_case()
+                        },
+                        true,
+                    )
                 };
                 out.push_str(&ctype);
 
@@ -849,15 +879,17 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             if result {
                 let octype = cfunc.proto.ret.trim_end_matches("*");
                 let ctype = c_type_as_binding(&octype, &spec.address);
-                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
-                {
+                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype) {
                     (c, false)
                 } else {
-                    (if octype.ends_with("_t") {
-                        octype[..octype.len() - 2].to_camel_case()
-                    } else {
-                        octype.to_camel_case()
-                    }, true)
+                    (
+                        if octype.ends_with("_t") {
+                            octype[..octype.len() - 2].to_camel_case()
+                        } else {
+                            octype.to_camel_case()
+                        },
+                        true,
+                    )
                 };
 
                 out.push_str(", ");
@@ -893,19 +925,21 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
 
                 let octype = octype.trim_end_matches("*");
                 let ctype = c_type_as_binding(&octype, &spec.address);
-                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
-                {
+                let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype) {
                     (c, false)
                 } else {
-                    (if octype.ends_with("_t") {
-                        octype[..octype.len() - 2].to_camel_case()
-                    } else {
-                        octype.to_camel_case()
-                    }, true)
+                    (
+                        if octype.ends_with("_t") {
+                            octype[..octype.len() - 2].to_camel_case()
+                        } else {
+                            octype.to_camel_case()
+                        },
+                        true,
+                    )
                 };
                 if adr {
                     out.push_str(&ctype);
-                    out.push_str("(");                    
+                    out.push_str("(");
                 }
                 out.push_str(&name);
                 if adr {
