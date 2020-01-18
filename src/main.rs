@@ -524,6 +524,16 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                         function_params.resize(function_params.len().max(num + 1), String::new());
                         function_params[num] = format!("{}.as_ptr()", name);
                     }
+                    "RAW" => { // Parameter (if object => ref)
+                        let name = iter.next().unwrap();
+                        let num = get_index(&cfunc.proto.pars, name);
+
+                        out.push_str("        ");
+                        out.push_str(name);
+                        out.push_str(": *mut std::os::raw::c_void,\n");
+                        function_params.resize(function_params.len().max(num + 1), String::new());
+                        function_params[num] = format!("{}", name);
+                    }
                     "VAL" => { // Parameter (if object => ref)
                         let name = iter.next().unwrap();
                         let num = get_index(&cfunc.proto.pars, name);
@@ -791,6 +801,14 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
                     get_formal_type(&cfunc.proto.pars, name)
                 };
 
+                if octype.ends_with("*") && octype.starts_with("void") {
+                    out.push_str("*mut std::os::raw::c_void");
+
+                    if length != 1 {
+                        out.push_str(",")
+                    }
+                    continue;
+                }
                 let octype = octype.trim_end_matches("*");
                 let ctype = c_type_as_binding(&octype, &spec.address);
                 let (ctype, adr) = if let Some(c) = c_binding_into_rust(&ctype)
