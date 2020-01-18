@@ -1,4 +1,4 @@
-use heck::CamelCase;
+use heck::{CamelCase, ShoutySnakeCase};
 use muon_rs as muon;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -440,17 +440,30 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
     }
 
     for module in mods {
-        out.push_str("\n/// A module contains functions.\npub struct ");
+        let init = module.name.to_shouty_snake_case();
+
+        out.push_str("\nstatic mut ");
+        out.push_str(&init);
+        out.push_str("_INIT: Option<");
+        out.push_str(&module.name);
+        out.push_str("> = None;\n");
+        out.push_str("\n/// A module contains functions.\n#[derive(Clone)]\npub struct ");
         out.push_str(&module.name);
         out.push_str("(std::marker::PhantomData<*mut u8>);\n\n");
 
         out.push_str("impl ");
         out.push_str(&module.name);
         out.push_str(" {\n");
-        out.push_str("    /// Load a module.\n");
+        out.push_str("    /// Get a handle to this module.  Loads module functions on first call.\n");
         out.push_str("    pub fn new() -> Option<Self> {\n");
         out.push_str("        unsafe {\n");
         out.push_str("            let dll = check_thread()?;\n");
+        out.push_str("            if let Some(ref module) = ");
+        out.push_str(&init);
+        out.push_str("_INIT {\n");
+        out.push_str("                return Some(module.clone());\n");
+        out.push_str("            }\n");
+
         for cfunc in &module.c_fn {
             let global = {
                 let mut temp = cfunc.proto.name.clone();
@@ -463,6 +476,9 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(&cfunc.proto.name);
             out.push_str("\\0\")?.as_ptr()));\n");
         }
+        out.push_str("            ");
+        out.push_str(&init);
+        out.push_str("_INIT = Some(Self(std::marker::PhantomData));\n");
         out.push_str("            Some(Self(std::marker::PhantomData))\n");
         out.push_str("        }\n");
         out.push_str("    }\n");
