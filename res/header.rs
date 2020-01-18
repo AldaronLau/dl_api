@@ -21,7 +21,7 @@ unsafe fn new(name: &[u8]) -> Option<std::ptr::NonNull<std::ffi::c_void>> {
     std::ptr::NonNull::new(dlmopen(LM_ID_NEWLM, name.as_ptr().cast(), RTLD_NOW))
 }
 
-unsafe fn sym(dll: &std::ptr::NonNull<std::ffi::c_void>, name: &[u8])
+unsafe fn sym(dll: std::ptr::NonNull<std::ffi::c_void>, name: &[u8])
     -> Option<std::ptr::NonNull<std::ffi::c_void>>
 {
     std::ptr::NonNull::new(dlsym(dll.as_ptr(), name.as_ptr().cast()))

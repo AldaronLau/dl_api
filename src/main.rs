@@ -459,7 +459,7 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             };
             out.push_str("            FN_");
             out.push_str(&global);
-            out.push_str(" = std::mem::MaybeUninit::new(std::mem::transmute(sym(&dll, b\"");
+            out.push_str(" = std::mem::MaybeUninit::new(std::mem::transmute(sym(dll, b\"");
             out.push_str(&cfunc.proto.name);
             out.push_str("\\0\")?.as_ptr()));\n");
         }
