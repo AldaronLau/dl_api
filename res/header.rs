@@ -2,7 +2,6 @@
 
 #![allow(clippy::unused_unit)]
 #![allow(clippy::let_unit_value)]
-#![allow(unused)]
 #![allow(unsafe_code)]
 // #![rustfmt::skip] // non-builtin inner attributes are unstable
 

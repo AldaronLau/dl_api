@@ -281,7 +281,8 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
             out.push_str(")]\n");
         }
         out.push_str(
-            "#[repr(C)]\n#[non_exhaustive]\n#[derive(Copy, Clone, Debug, PartialEq)]\npub enum ",
+            "#[allow(unused)]#[repr(C)]#[non_exhaustive]\
+             #[derive(Copy,Clone,Debug,PartialEq)]\npub enum ",
         );
         if en.name.ends_with("_t") {
             out.push_str(&en.name[..en.name.len() - 2].to_camel_case());
@@ -330,12 +331,41 @@ fn convert(spec: &SafeFFI, mut out: String, so_name: &str) -> String {
         } else {
             out.push_str("std::os::raw::c_void");
         }
-        out.push_str(");\n\nimpl ");
+        out.push_str(");\n\n");
+        /*out.push_str("impl ");
         out.push_str(&name);
-        out.push_str(" {\n    /// Create address struct from raw pointer.\n    pub unsafe fn from_raw(raw: *mut std::os::raw::c_void) -> Self {\n        Self(raw)\n    }\n}\n\n");
+        out.push_str(" {\n    /// Create address struct from raw pointer.\n    pub unsafe fn from_raw(raw: *mut std::os::raw::c_void) -> Self {\n        Self(raw)\n    }\n}\n\n");*/
     }
 
-    // FIXME: Structs
+    // Structs
+    for record in &spec.r#struct {
+        let name = if record.name.ends_with("_t") {
+            record.name[..record.name.len() - 2].to_camel_case()
+        } else {
+            record.name.to_camel_case()
+        };
+
+        if let Some(ref doc) = record.doc {
+            out.push_str("/// ");
+            out.push_str(&doc.replace("\n", "\n/// "));
+            out.push_str("\n");
+        }
+
+        out.push_str("#[repr(C)]\n");
+        out.push_str("#[derive(Copy, Clone)]\n");
+        out.push_str("pub struct ");
+        out.push_str(&name);
+        out.push_str(" {\n");
+        for field in &record.field {
+            let ty = c_type_as_binding(&field.r#type, &spec.address);
+            out.push_str("    pub ");
+            out.push_str(&field.name);
+            out.push_str(": ");
+            out.push_str(&ty);
+            out.push_str(",\n");
+        }
+        out.push_str("}\n\n");
+    }
 
     // Functions
     struct Module {
