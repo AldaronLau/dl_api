@@ -36,7 +36,7 @@ categories = ["api-bindings", "external-ffi-bindings", "os::unix-apis", "os::win
 exclude = ["examples/*", ".gitignore", "_config.yml", "changelog.md"]
 
 [dependencies]
-lazy_static = "0.2"
+lazy_static = "1.4"
 muon-rs = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 heck = "0.3"
