@@ -58,7 +58,10 @@
 #[allow(unsafe_code)]
 mod ffi;
 
+mod error;
 mod linker;
 /// Manual loading of dynamic libraries.  Usually, you'll want to use `link!()`
 /// instead.
 pub mod manual;
+
+pub use error::Error;

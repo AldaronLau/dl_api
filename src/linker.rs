@@ -27,9 +27,8 @@
 #[macro_export]
 macro_rules! linker(
 	(extern $abi: literal/*item*/ $sname: ident $filename: literal {
-        $(fn $name: ident($($sarg: ident: $farg: ty),* $(,)?) -> $fret:ty);*
-    }) =>
-    {
+      $(fn $name: ident ($($sarg: ident: $farg: ty),* $(,)?) -> $fret:ty;)*
+    }) => {
 		#[allow(non_snake_case)]
 		struct $sname {
 			$(
@@ -45,18 +44,17 @@ macro_rules! linker(
     	    		    ::std::ffi::CStr::from_bytes_with_nul_unchecked(
     	    		        FILENAME.as_bytes()
 	    		        )
-	    		    ).ok_or($crate::Error::)?;
-
-                    Self {
-        				$($name: {
+	    		    ).ok_or($crate::Error::NotInstalled)?;
+                    ::std::result::Result::<Self, $crate::Error>::Ok(Self { $(
+                        $name: {
             				const NAME: &str = concat!(stringify!($name), "\0");
-            				dl_api.get(
+            				::std::mem::transmute(dl_api.get(
                 				::std::ffi::CStr::from_bytes_with_nul_unchecked(
                 				    NAME.as_bytes()
                 				)
-            				).ok_or($crate::Error::)?;
-        				},)*
-    				}
+            				).ok_or($crate::Error::DoesntExist(stringify!($name)))?)
+        				},
+    				)* })
 				}
 			}
 		}
