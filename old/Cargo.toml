@@ -1,0 +1,35 @@
+# dl_api
+#
+# Copyright © 2018-2020 Jeron Aldaron Lau
+# Dual-licensed under either the MIT License or the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_BSL.txt or copy at https://www.boost.org/LICENSE_1_0.txt, and
+# accompanying file LICENSE_MIT.txt or copy at https://opensource.org/licenses/MIT)
+
+[package]
+name = "dl_api"
+version = "0.3.1"
+authors = [
+	"Jeron Aldaron Lau <jeronaldaron@gmail.com>"
+]
+edition = "2018"
+license = "MIT / BSL-1.0"
+documentation = "https://docs.rs/dl_api"
+homepage = "https://free.plopgrizzly.com/dl_api/"
+repository = "https://github.com/plopgrizzly/dl_api"
+readme = "README.md"
+description = "The easiest, simplest and safest way to load dynamic (shared object) libraries from Rust!"
+keywords = ["dlopen", "dll", "so", "dylib", "shared"]
+categories = ["api-bindings", "external-ffi-bindings", "os::unix-apis", "os::windows-apis"]
+exclude = ["examples/*", ".gitignore", "_config.yml", "changelog.md"]
+
+[dependencies]
+lazy_static = "1.4"
+muon-rs = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+heck = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "libloaderapi", "winerror", "minwindef", "errhandlingapi"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

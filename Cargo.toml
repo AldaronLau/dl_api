@@ -1,35 +1,45 @@
-# dl_api
+# DL API
 #
-# Copyright © 2018-2020 Jeron Aldaron Lau
-# Dual-licensed under either the MIT License or the Boost Software License, Version 1.0.
-# (See accompanying file LICENSE_BSL.txt or copy at https://www.boost.org/LICENSE_1_0.txt, and
-# accompanying file LICENSE_MIT.txt or copy at https://opensource.org/licenses/MIT)
+# Copyright (c) 2018-2020 Jeron Aldaron Lau
+# 
+# Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+# https://apache.org/licenses/LICENSE-2.0>, or the Zlib License, <LICENSE-ZLIB
+# or http://opensource.org/licenses/Zlib>, at your option. This file may not be
+# copied, modified, or distributed except according to those terms.
 
 [package]
 name = "dl_api"
-version = "0.3.1"
-authors = [
-	"Jeron Aldaron Lau <jeronaldaron@gmail.com>"
-]
-edition = "2018"
-license = "MIT / BSL-1.0"
-documentation = "https://docs.rs/dl_api"
-homepage = "https://free.plopgrizzly.com/dl_api/"
-repository = "https://github.com/plopgrizzly/dl_api"
-readme = "README.md"
-description = "The easiest, simplest and safest way to load dynamic (shared object) libraries from Rust!"
-keywords = ["dlopen", "dll", "so", "dylib", "shared"]
-categories = ["api-bindings", "external-ffi-bindings", "os::unix-apis", "os::windows-apis"]
-exclude = ["examples/*", ".gitignore", "_config.yml", "changelog.md"]
+version = "0.4.0"
+authors = ["Jeron Aldaron Lau <jeronlau@plopgrizzly.com>"]
+license = "Apache-2.0 OR Zlib"
 
-[dependencies]
-lazy_static = "1.4"
-muon-rs = "0.2"
-serde = { version = "1.0", features = ["derive"] }
-heck = "0.3"
+description = "The easiest, simplest and safest way to load dynamic (shared object) libraries from Rust!"
+repository = "https://github.com/AldaronLau/dl_api"
+documentation = "https://docs.rs/dl_api"
+homepage = "https://github.com/AldaronLau/dl_api/blob/master/CHANGELOG.md"
+include = ["Cargo.toml", "README.md", "LICENSE-ZLIB", "LICENSE-APACHE", "src/*"]
+categories = ["api-bindings", "external-ffi-bindings", "os::unix-apis", "os::windows-apis"]
+keywords = ["dlopen", "dll", "so", "dylib", "shared"]
+readme = "README.md"
+edition = "2018"
+
+[badges]
+travis-ci = { repository = "AldaronLau/dl_api" }
+is-it-maintained-issue-resolution = { repository = "AldaronLau/dl_api" }
+is-it-maintained-open-issues = { repository = "AldaronLau/dl_api" }
+maintenance = { status = "actively-developed" }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "libloaderapi", "winerror", "minwindef", "errhandlingapi"] }
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
+[build-dependencies]
+
+[dev-dependencies]
+
+[package.metadata.docs.rs]
+all-features = true
+default-target = "x86_64-unknown-linux-gnu"
+
+[features]
+default = []
+docs-rs = []
