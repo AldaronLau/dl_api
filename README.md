@@ -43,15 +43,15 @@ your `extern "C"`s into `link!()`s.
 ```rust
 // Shared object: either "libmylibrary.so.1", "mylibrary-1.dll" or "libMyLibrary.dylib"
 dl_api::link!(MyApi, "libmylibrary.so.1", {
-	fn cFunction(param_name: ParamType) -> ReturnType;
+    fn cFunction(param_name: ParamType) -> ReturnType;
 });
 
 fn main() {
-	let api = MyApi::new().unwrap(); // unwrap the `Result`.
+    let api = MyApi::new().unwrap(); // unwrap the `Result`.
 
-	let rtn: ReturnType = unsafe {
-		(api.cFunction)(0);
-	};
+    let rtn: ReturnType = unsafe {
+        (api.cFunction)(0);
+    };
 }
 ```
 
