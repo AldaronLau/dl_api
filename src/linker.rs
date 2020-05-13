@@ -27,34 +27,58 @@
 #[macro_export]
 macro_rules! linker(
 	(extern $abi: literal/*item*/ $sname: ident $filename: literal {
-      $(fn $name: ident ($($sarg: ident: $farg: ty),* $(,)?) -> $fret:ty;)*
+      $(static $data:ident : $darg:ty;)*
+      $(valist fn $vafn:ident ($($varg:ident : $fvrg:ty),* , ...) -> $frvt:ty;)*
+      $(fn $name:ident ($($sarg:ident : $farg:ty),* $(,)?) -> $fret:ty;)*
     }) => {
 		#[allow(non_snake_case)]
 		struct $sname {
-			$(
-				$name: unsafe extern $abi fn($($farg),*) -> $fret,
-			)*
+		    $( $data: $darg, )*
+			$( $vafn: unsafe extern $abi fn($($fvrg),*, ...) -> $frvt, )*
+			$( $name: unsafe extern $abi fn($($farg),*) -> $fret, )*
 		}
 
 		impl $sname {
 			fn new() -> ::std::result::Result<Self, $crate::Error> {
 				unsafe {
-    				const FILENAME: &str = concat!(stringify!($filename), "\0");
+    				const FILENAME: &str = concat!($filename, "\0");
 	    		    let dl_api = $crate::manual::DlApi::new(
     	    		    ::std::ffi::CStr::from_bytes_with_nul_unchecked(
     	    		        FILENAME.as_bytes()
 	    		        )
 	    		    ).ok_or($crate::Error::NotInstalled)?;
-                    ::std::result::Result::<Self, $crate::Error>::Ok(Self { $(
-                        $name: {
-            				const NAME: &str = concat!(stringify!($name), "\0");
-            				::std::mem::transmute(dl_api.get(
-                				::std::ffi::CStr::from_bytes_with_nul_unchecked(
-                				    NAME.as_bytes()
-                				)
-            				).ok_or($crate::Error::DoesntExist(stringify!($name)))?)
-        				},
-    				)* })
+                    ::std::result::Result::<Self, $crate::Error>::Ok(Self {
+                        $(
+                            $data: {
+                                const NAME: &str = concat!(stringify!($data), "\0");
+                				::std::mem::transmute(dl_api.get(
+                    				::std::ffi::CStr::from_bytes_with_nul_unchecked(
+                    				    NAME.as_bytes()
+                    				)
+                				).ok_or($crate::Error::DoesntExist(stringify!($data)))?)
+                            },
+                        )*
+                        $(
+                            $vafn: {
+                				const NAME: &str = concat!(stringify!($vafn), "\0");
+                				::std::mem::transmute(dl_api.get(
+                    				::std::ffi::CStr::from_bytes_with_nul_unchecked(
+                    				    NAME.as_bytes()
+                    				)
+                				).ok_or($crate::Error::DoesntExist(stringify!($vafn)))?)
+            				},
+        				)*
+                        $(
+                            $name: {
+                				const NAME: &str = concat!(stringify!($name), "\0");
+                				::std::mem::transmute(dl_api.get(
+                    				::std::ffi::CStr::from_bytes_with_nul_unchecked(
+                    				    NAME.as_bytes()
+                    				)
+                				).ok_or($crate::Error::DoesntExist(stringify!($name)))?)
+            				},
+        				)*
+    				})
 				}
 			}
 		}
