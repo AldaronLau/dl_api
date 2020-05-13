@@ -20,7 +20,6 @@ pub struct DlApi(DlApiNative);
 impl DlApi {
     /// Load a Dynamic Library API
     pub fn new(filename: &CStr) -> Option<Self> {
-        println!("DEBUG: {:?}", filename);
         Some(DlApi(DlApiNative::new(filename)?))
     }
 
