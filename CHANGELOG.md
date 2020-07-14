@@ -4,7 +4,22 @@ All notable changes to DL API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://jeronlau.tk/semver/).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2020-07-13
+### Added
+- `Error::NotInstalled`
+- `Error::DoesntExist`
+- `manual` module
+- Support for C var\_args
+
+### Changed
+- Rename `link!` to `linker!`
+- `linker!` now requires writing the ABI
+
+### Removed
+- `Error::NullCharacter`
+- `Error::OpeningLibraryError`
+- `Error::SymbolGettingError`
+- `Error::NullSymbol`
 
 ## [0.3.1] - 2019-03-07
 ### Fixed
